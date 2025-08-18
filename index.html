@@ -9,7 +9,7 @@
   <style>
     body { margin:0; padding:0; display:flex; }
     #sidebar {
-      width: 240px;
+      width: 220px;
       padding: 10px;
       background: #f8f8f8;
       border-right: 1px solid #ddd;
@@ -19,24 +19,18 @@
     }
     #map { flex:1; height:100vh; }
     h3 { margin-top: 20px; margin-bottom: 5px; }
-    .subcategory { margin-left: 20px; }
   </style>
 </head>
 <body>
   <div id="sidebar">
-    <h3><input type="checkbox" id="firstHalfParent"> First Part of Year</h3>
-    <div class="subcategory">
-      <label><input type="checkbox" id="liver"> Liver</label><br>
-      <label><input type="checkbox" id="heart"> Heart</label>
-    </div>
+    <h3>First Part of Year</h3>
+    <label><input type="checkbox" id="liver"> Liver</label><br>
+    <label><input type="checkbox" id="heart"> Heart</label>
 
-    <h3><input type="checkbox" id="secondHalfParent"> Second Part of Year</h3>
-    <div class="subcategory">
-      <label><input type="checkbox" id="diabetes"> Diabetes</label><br>
-      <label><input type="checkbox" id="brain"> Brain</label>
-    </div>
+    <h3>Second Part of Year</h3>
+    <label><input type="checkbox" id="diabetes"> Diabetes</label><br>
+    <label><input type="checkbox" id="brain"> Brain</label>
   </div>
-
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -68,38 +62,26 @@
       L.marker([35.6895, 139.6917], {icon: purpleIcon}).bindPopup("<b>Brain Conference</b><br>Oct 12-14, 2026<br>Brain conference in Tokyo")
     ];
 
-    // Toggle function for subcategory markers
-    function toggleMarkers(checkboxId, markers){
-      document.getElementById(checkboxId).addEventListener('change', function(){
-        if(this.checked) markers.forEach(m => m.addTo(map));
-        else markers.forEach(m => map.removeLayer(m));
+    // Functions to toggle markers
+    function toggleMarkers(checkboxId, markers) {
+      document.getElementById(checkboxId).addEventListener('change', function() {
+        if(this.checked){
+          markers.forEach(m => m.addTo(map));
+        } else {
+          markers.forEach(m => map.removeLayer(m));
+        }
       });
     }
 
-    // Initialize all toggles
+    // Initialize all toggle checkboxes
     toggleMarkers("liver", liverMarkers);
     toggleMarkers("heart", heartMarkers);
     toggleMarkers("diabetes", diabetesMarkers);
     toggleMarkers("brain", brainMarkers);
 
-    // Show Liver markers by default
+    // Optionally, show some markers by default
     document.getElementById("liver").checked = true;
     liverMarkers.forEach(m => m.addTo(map));
-
-    // Parent toggle functions
-    function parentToggle(parentId, childIds){
-      document.getElementById(parentId).addEventListener('change', function(){
-        childIds.forEach(id => {
-          let cb = document.getElementById(id);
-          cb.checked = this.checked;
-          cb.dispatchEvent(new Event('change'));
-        });
-      });
-    }
-
-    // First and Second Half parent toggles
-    parentToggle("firstHalfParent", ["liver", "heart"]);
-    parentToggle("secondHalfParent", ["diabetes", "brain"]);
   </script>
 </body>
 </html>
