@@ -5,90 +5,83 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.groupedlayercontrol/dist/leaflet.groupedlayercontrol.min.css"/>
-  
   <style>
-    /* Fullscreen map */
-    #map { height: 100vh; width: 100%; }
+    body { margin:0; padding:0; display:flex; }
+    #sidebar {
+      width: 220px;
+      padding: 10px;
+      background: #f8f8f8;
+      border-right: 1px solid #ddd;
+      font-family: sans-serif;
+      overflow-y: auto;
+      height: 100vh;
+    }
+    #map { flex:1; height:100vh; }
+    h3 { margin-top: 20px; margin-bottom: 5px; }
   </style>
 </head>
 <body>
+  <div id="sidebar">
+    <h3>First Part of Year</h3>
+    <label><input type="checkbox" id="liver"> Liver</label><br>
+    <label><input type="checkbox" id="heart"> Heart</label>
+
+    <h3>Second Part of Year</h3>
+    <label><input type="checkbox" id="diabetes"> Diabetes</label><br>
+    <label><input type="checkbox" id="brain"> Brain</label>
+  </div>
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.groupedlayercontrol/dist/leaflet.groupedlayercontrol.min.js"></script>
-
   <script>
-    // Initialize map
-    var map = L.map('map').setView([48.8566, 2.3522], 3); // centered near Europe
+    var map = L.map('map').setView([48.8566, 2.3522], 3);
 
-    // Base tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // -------------------------
-    // Colored marker icons (CDN-hosted)
-    // -------------------------
-    var greenIcon = new L.Icon({
-      iconUrl: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-green.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
+    // Marker icons
+    var greenIcon = new L.Icon({iconUrl:'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-green.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34], shadowSize:[41,41]});
+    var redIcon = new L.Icon({iconUrl:'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-red.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34], shadowSize:[41,41]});
+    var blueIcon = new L.Icon({iconUrl:'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-blue.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34], shadowSize:[41,41]});
+    var purpleIcon = new L.Icon({iconUrl:'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-violet.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34], shadowSize:[41,41]});
 
-    var redIcon = new L.Icon({
-      iconUrl: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-red.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
-
-    var blueIcon = new L.Icon({
-      iconUrl: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-blue.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
-
-    var purpleIcon = new L.Icon({
-      iconUrl: 'https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-violet.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
-
-    // -------------------------
     // Markers
-    // -------------------------
-    // First Part of Year
-    var parisLiver = L.marker([48.8566, 2.3522], {icon: greenIcon}).bindPopup("<b>AHA Conference</b><br>Date: Feb 10-12, 2026<br>Description: Liver conference in Paris");
-    var berlinLiver = L.marker([52.5200, 13.4050], {icon: greenIcon}).bindPopup("<b>SABC Conference</b><br>Date: Mar 5-7, 2026<br>Description: Liver conference in Berlin");
-    var heartExample = L.marker([41.9028, 12.4964], {icon: redIcon}).bindPopup("<b>Heart Conference</b><br>Date: Apr 15-17, 2026<br>Description: Example Heart conference in Rome");
+    var liverMarkers = [
+      L.marker([48.8566, 2.3522], {icon: greenIcon}).bindPopup("<b>AHA Conference</b><br>Feb 10-12, 2026<br>Liver conference in Paris"),
+      L.marker([52.5200, 13.4050], {icon: greenIcon}).bindPopup("<b>SABC Conference</b><br>Mar 5-7, 2026<br>Liver conference in Berlin")
+    ];
+    var heartMarkers = [
+      L.marker([41.9028, 12.4964], {icon: redIcon}).bindPopup("<b>Heart Conference</b><br>Apr 15-17, 2026<br>Heart conference in Rome")
+    ];
+    var diabetesMarkers = [
+      L.marker([40.7128, -74.0060], {icon: blueIcon}).bindPopup("<b>Diabetes Conference</b><br>Sep 20-22, 2026<br>Diabetes conference in NYC")
+    ];
+    var brainMarkers = [
+      L.marker([35.6895, 139.6917], {icon: purpleIcon}).bindPopup("<b>Brain Conference</b><br>Oct 12-14, 2026<br>Brain conference in Tokyo")
+    ];
 
-    // Second Part of Year
-    var diabetesExample = L.marker([40.7128, -74.0060], {icon: blueIcon}).bindPopup("<b>Diabetes Conference</b><br>Date: Sep 20-22, 2026<br>Description: Example Diabetes conference in NYC");
-    var brainExample = L.marker([35.6895, 139.6917], {icon: purpleIcon}).bindPopup("<b>Brain Conference</b><br>Date: Oct 12-14, 2026<br>Description: Example Brain conference in Tokyo");
+    // Functions to toggle markers
+    function toggleMarkers(checkboxId, markers) {
+      document.getElementById(checkboxId).addEventListener('change', function() {
+        if(this.checked){
+          markers.forEach(m => m.addTo(map));
+        } else {
+          markers.forEach(m => map.removeLayer(m));
+        }
+      });
+    }
 
-    // -------------------------
-    // Layer Groups
-    // -------------------------
-    var firstHalf = {
-      "Liver": L.layerGroup([parisLiver, berlinLiver]),
-      "Heart": L.layerGroup([heartExample])
-    };
+    // Initialize all toggle checkboxes
+    toggleMarkers("liver", liverMarkers);
+    toggleMarkers("heart", heartMarkers);
+    toggleMarkers("diabetes", diabetesMarkers);
+    toggleMarkers("brain", brainMarkers);
 
-    var secondHalf = {
-      "Diabetes": L.layerGroup([diabetesExample]),
-      "Brain": L.layerGroup([brainExample])
-    };
-
-    // -------------------------
-    // Grouped Layer Control
-    // -------------------------
-    L.control.groupedLayers(null, {
-      "First Part of Year": firstHalf,
-      "Second Part of Year": secondHalf
-    }).addTo(map);
+    // Optionally, show some markers by default
+    document.getElementById("liver").checked = true;
+    liverMarkers.forEach(m => m.addTo(map));
   </script>
 </body>
 </html>
