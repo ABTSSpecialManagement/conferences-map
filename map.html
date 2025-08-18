@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Conference Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.groupedlayercontrol/dist/leaflet.groupedlayercontrol.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.groupedlayercontrol/dist/leaflet.groupedlayercontrol.min.css" />
+
+<script>
+  // Init map
+  var map = L.map('map').setView([20,0], 2);
+
+  // Base tiles
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  // Example markers
+  var cardiology1 = L.marker([34.05, -118.25]).bindPopup("Cardiology Conf LA, Feb");
+  var liver1 = L.marker([18.47, -66.10]).bindPopup("Liver Conf San Juan, Apr");
+  var diabetes2 = L.marker([50.06, 19.94]).bindPopup("Diabetes Conf Kraków, Oct");
+
+  // Layer groups
+  var firstHalf = {
+    "Cardiology": L.layerGroup([cardiology1]),
+    "Liver": L.layerGroup([liver1])
+  };
+  var secondHalf = {
+    "Diabetes": L.layerGroup([diabetes2])
+  };
+
+  // Grouped Layer Control
+  L.control.groupedLayers(null, {
+    "First Half of Year": firstHalf,
+    "Second Half of Year": secondHalf
+  }).addTo(map);
+</script>
+</body>
+</html>
