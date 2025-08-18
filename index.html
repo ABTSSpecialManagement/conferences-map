@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Conference Map</title>
+  <title>Conference Map with Nested Filters</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -26,14 +26,14 @@
   <div id="sidebar">
     <h3><input type="checkbox" id="firstHalfParent"> First Part of Year</h3>
     <div class="subcategory">
-      <label><input type="checkbox" id="liver"> Liver</label><br>
-      <label><input type="checkbox" id="heart"> Heart</label>
+      <label><input type="checkbox" class="firstHalfChild" id="liver"> Liver</label><br>
+      <label><input type="checkbox" class="firstHalfChild" id="heart"> Heart</label>
     </div>
 
     <h3><input type="checkbox" id="secondHalfParent"> Second Part of Year</h3>
     <div class="subcategory">
-      <label><input type="checkbox" id="diabetes"> Diabetes</label><br>
-      <label><input type="checkbox" id="brain"> Brain</label>
+      <label><input type="checkbox" class="secondHalfChild" id="diabetes"> Diabetes</label><br>
+      <label><input type="checkbox" class="secondHalfChild" id="brain"> Brain</label>
     </div>
   </div>
 
@@ -68,38 +68,54 @@
       L.marker([35.6895, 139.6917], {icon: purpleIcon}).bindPopup("<b>Brain Conference</b><br>Oct 12-14, 2026<br>Brain conference in Tokyo")
     ];
 
-    // Toggle function for subcategory markers
-    function toggleMarkers(checkboxId, markers){
-      document.getElementById(checkboxId).addEventListener('change', function(){
+    // Helper function to toggle markers
+    function toggleMarkers(checkbox, markers){
+      checkbox.addEventListener('change', function(){
         if(this.checked) markers.forEach(m => m.addTo(map));
         else markers.forEach(m => map.removeLayer(m));
+        updateParentCheckbox(this);
       });
     }
 
-    // Initialize all toggles
-    toggleMarkers("liver", liverMarkers);
-    toggleMarkers("heart", heartMarkers);
-    toggleMarkers("diabetes", diabetesMarkers);
-    toggleMarkers("brain", brainMarkers);
+    // Add toggle listeners for children
+    toggleMarkers(document.getElementById('liver'), liverMarkers);
+    toggleMarkers(document.getElementById('heart'), heartMarkers);
+    toggleMarkers(document.getElementById('diabetes'), diabetesMarkers);
+    toggleMarkers(document.getElementById('brain'), brainMarkers);
 
-    // Show Liver markers by default
-    document.getElementById("liver").checked = true;
+    // Parent toggles
+    function parentToggle(parentCheckbox, childClass){
+      parentCheckbox.addEventListener('change', function(){
+        var children = document.getElementsByClassName(childClass);
+        for(var i=0;i<children.length;i++){
+          children[i].checked = this.checked;
+          children[i].dispatchEvent(new Event('change'));
+        }
+      });
+    }
+
+    // Update parent checkbox based on children
+    function updateParentCheckbox(childCheckbox){
+      var parent, childClass;
+      if(childCheckbox.classList.contains('firstHalfChild')){
+        parent = document.getElementById('firstHalfParent');
+        childClass = 'firstHalfChild';
+      } else if(childCheckbox.classList.contains('secondHalfChild')){
+        parent = document.getElementById('secondHalfParent');
+        childClass = 'secondHalfChild';
+      }
+      var children = document.getElementsByClassName(childClass);
+      parent.checked = Array.from(children).every(c => c.checked);
+    }
+
+    // Initialize parent toggles
+    parentToggle(document.getElementById('firstHalfParent'), 'firstHalfChild');
+    parentToggle(document.getElementById('secondHalfParent'), 'secondHalfChild');
+
+    // Show Liver by default
+    document.getElementById('liver').checked = true;
     liverMarkers.forEach(m => m.addTo(map));
-
-    // Parent toggle functions
-    function parentToggle(parentId, childIds){
-      document.getElementById(parentId).addEventListener('change', function(){
-        childIds.forEach(id => {
-          let cb = document.getElementById(id);
-          cb.checked = this.checked;
-          cb.dispatchEvent(new Event('change'));
-        });
-      });
-    }
-
-    // First and Second Half parent toggles
-    parentToggle("firstHalfParent", ["liver", "heart"]);
-    parentToggle("secondHalfParent", ["diabetes", "brain"]);
+    updateParentCheckbox(document.getElementById('liver'));
   </script>
 </body>
 </html>
