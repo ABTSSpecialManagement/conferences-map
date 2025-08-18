@@ -42,6 +42,7 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
     var map = L.map('map').setView([48.8566, 2.3522], 3);
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
@@ -67,51 +68,54 @@
       L.marker([35.6895, 139.6917], {icon: purpleIcon}).bindPopup("<b>Brain Conference</b><br>Oct 12-14, 2026<br>Brain conference in Tokyo")
     ];
 
-    // Helper: toggle markers on/off
-    function setMarkers(markers, show){
-      markers.forEach(m => {
-        if(show) map.addLayer(m);
-        else map.removeLayer(m);
+    // Helper function to toggle markers
+    function toggleMarkers(checkbox, markers){
+      checkbox.addEventListener('change', function(){
+        if(this.checked) markers.forEach(m => m.addTo(map));
+        else markers.forEach(m => map.removeLayer(m));
+        updateParentCheckbox(this);
       });
     }
 
-    // Child checkbox event
-    function setupChild(childId, markers, parentCheckbox){
-      const child = document.getElementById(childId);
-      child.addEventListener('change', function(){
-        setMarkers(markers, this.checked);
+    // Add toggle listeners for children
+    toggleMarkers(document.getElementById('liver'), liverMarkers);
+    toggleMarkers(document.getElementById('heart'), heartMarkers);
+    toggleMarkers(document.getElementById('diabetes'), diabetesMarkers);
+    toggleMarkers(document.getElementById('brain'), brainMarkers);
 
-        // update parent
-        const siblings = document.getElementsByClassName(child.classList[0]);
-        parentCheckbox.checked = Array.from(siblings).every(c => c.checked);
+    // Parent toggles
+    function parentToggle(parentCheckbox, childClass){
+      parentCheckbox.addEventListener('change', function(){
+        var children = document.getElementsByClassName(childClass);
+        for(var i=0;i<children.length;i++){
+          children[i].checked = this.checked;
+          children[i].dispatchEvent(new Event('change'));
+        }
       });
     }
 
-    // Parent checkbox event
-    function setupParent(parentId, childClass){
-      const parent = document.getElementById(parentId);
-      parent.addEventListener('change', function(){
-        const children = document.getElementsByClassName(childClass);
-        Array.from(children).forEach(c => {
-          c.checked = this.checked;
-          c.dispatchEvent(new Event('change')); // trigger child change
-        });
-      });
+    // Update parent checkbox based on children
+    function updateParentCheckbox(childCheckbox){
+      var parent, childClass;
+      if(childCheckbox.classList.contains('firstHalfChild')){
+        parent = document.getElementById('firstHalfParent');
+        childClass = 'firstHalfChild';
+      } else if(childCheckbox.classList.contains('secondHalfChild')){
+        parent = document.getElementById('secondHalfParent');
+        childClass = 'secondHalfChild';
+      }
+      var children = document.getElementsByClassName(childClass);
+      parent.checked = Array.from(children).every(c => c.checked);
     }
 
-    // Set up parent/child relationships
-    setupParent('firstHalfParent', 'firstHalfChild');
-    setupParent('secondHalfParent', 'secondHalfChild');
-
-    setupChild('liver', liverMarkers, document.getElementById('firstHalfParent'));
-    setupChild('heart', heartMarkers, document.getElementById('firstHalfParent'));
-    setupChild('diabetes', diabetesMarkers, document.getElementById('secondHalfParent'));
-    setupChild('brain', brainMarkers, document.getElementById('secondHalfParent'));
+    // Initialize parent toggles
+    parentToggle(document.getElementById('firstHalfParent'), 'firstHalfChild');
+    parentToggle(document.getElementById('secondHalfParent'), 'secondHalfChild');
 
     // Show Liver by default
     document.getElementById('liver').checked = true;
-    setMarkers(liverMarkers, true);
-    document.getElementById('firstHalfParent').checked = false;
+    liverMarkers.forEach(m => m.addTo(map));
+    updateParentCheckbox(document.getElementById('liver'));
   </script>
 </body>
 </html>
