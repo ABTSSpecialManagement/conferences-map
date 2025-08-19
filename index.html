@@ -6,10 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    body { margin:0; padding:0; display:flex; height:100vh; }
-    #sidebar { width: 300px; padding: 12px; background: #f8f8f8; border-right: 1px solid #ddd; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; overflow-y: auto; }
-    #map { flex:1; height:100vh; }
-    #legend { width: 240px; padding: 12px; background: #fafafa; border-left: 1px solid #ddd; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; overflow-y: auto; }
+    body { margin:0; padding:0; display:flex; flex-direction:column; height:100vh; }
+    #main { flex:1; display:flex; min-height:0; }
+    #sidebar {
+      width: 300px; padding: 12px; background: #f8f8f8; border-right: 1px solid #ddd;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; overflow-y: auto;
+    }
+    #map { flex:1; height: 100%; }
+    #legend {
+      width: 240px; padding: 12px; background: #fafafa; border-left: 1px solid #ddd;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; overflow-y: auto;
+    }
     h2 { margin: 8px 0; font-size: 16px; }
     h3 { margin: 16px 0 6px; font-size: 14px; }
     .subs-list label { display:block; margin: 2px 0; font-size: 13px; }
@@ -19,116 +26,68 @@
     .legend-item img { width: 16px; height: 26px; image-rendering: -webkit-optimize-contrast; }
     .popup-content { line-height: 1.3; font-size: 13px; }
     .popup-content a { word-break: break-all; }
+
+    /* Bottom panel with visible-on-screen conference cards */
+    #bottom-panel {
+      border-top: 1px solid #ddd;
+      background: #fff;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    .conf-card {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #f9f9f9;
+      cursor: pointer;
+      flex: 1 1 240px;
+      font-size: 13px;
+    }
+    .conf-card:hover { background: #eee; }
+    .conf-title { font-weight: 600; margin-bottom: 4px; }
+    .conf-meta { color:#444; }
   </style>
 </head>
 <body>
-  <div id="sidebar">
-    <h2>Semester I (Jan–Jun)</h2>
-    <div id="sem-I" class="subs-list"></div>
-    <h2>Semester II (Jul–Dec)</h2>
-    <div id="sem-II" class="subs-list"></div>
-    <hr>
-    <div class="muted">Pins use baked-in coordinates per city from your sheet. Unknown cities fall back to live geocoding.</div>
+  <div id="main">
+    <div id="sidebar">
+      <h2>Semester I (Jan–Jun)</h2>
+      <div id="sem-I" class="subs-list"></div>
+      <h2>Semester II (Jul–Dec)</h2>
+      <div id="sem-II" class="subs-list"></div>
+      <hr>
+      <div class="muted">Pins use baked-in coordinates per city from your sheet. Unknown cities fall back to live geocoding.</div>
+    </div>
+    <div id="map"></div>
+    <div id="legend">
+      <div class="legend-title">Legend (Subspecialty → Color)</div>
+      <div id="legend-items"></div>
+    </div>
   </div>
 
-  <div id="map"></div>
-
-  <div id="legend">
-    <div class="legend-title">Legend (Subspecialty → Color)</div>
-    <div id="legend-items"></div>
-  </div>
+  <div id="bottom-panel"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-  // ======= Your prepared data (trimmed to what matters for the map) =======
-  const DATA = [{"semester":"I","subspecialty":"Oncology","location_raw":"San Francisco","name":"ASCO GI","full_name":"ASCO Gastrointestinal (GI) Cancers Symposium","additional_description":"Oncology (Gastrointestinal)","start_date":"2026-01-08T00:00:00","end_date":"2026-01-10T00:00:00","lat":37.7749,"lon":-122.4194},
-{"semester":"I","subspecialty":"Hepatology","location_raw":"Edinburgh","name":"EASL-LCS","full_name":"EASL Liver Cancer Summit","additional_description":"Hepatology / Liver Cancer","start_date":"2026-01-22T00:00:00","end_date":"2026-01-24T00:00:00","lat":55.9533,"lon":-3.1883},
-{"semester":"I","subspecialty":"Hematology","location_raw":"Dublin","name":"EAHAD","full_name":"European Association for Haemophilia and Allied Disorders","additional_description":"Hematology (Hemophilia)","start_date":"2026-02-03T00:00:00","end_date":"2026-02-06T00:00:00","lat":53.3498,"lon":-6.2603},
-{"semester":"I","subspecialty":"Hematology","location_raw":"Salt Lake City","name":"ASTCT/CIBMTR","full_name":"American Society for Transplantation and Cellular Therapy /Center for International Blood and Marrow Transplant Research","additional_description":"Hematology / Transplantation","start_date":"2026-02-04T00:00:00","end_date":"2026-02-07T00:00:00","lat":40.7608,"lon":-111.891},
-{"semester":"I","subspecialty":"Neurology","location_raw":"San Diego","name":"ACTRIMS Forum","full_name":"Americas Committee for Treatment and Research in Multiple Sclerosis","additional_description":"Neurology (Multiple Sclerosis)","start_date":"2026-02-05T00:00:00","end_date":"2026-02-07T00:00:00","lat":32.7157,"lon":-117.1611},
-{"semester":"I","subspecialty":"Ophthalmology","location_raw":"Hong Kong","name":"APAO","full_name":"Asia-Pacific Academy of Ophthalmology","additional_description":"Ophthalmology","start_date":"2026-02-05T00:00:00","end_date":"2026-02-08T00:00:00","lat":22.3193,"lon":114.1694},
-{"semester":"I","subspecialty":"Gastroenterology","location_raw":"Stockholm","name":"ECCO","full_name":"European Crohn’s and Colitis Organisation","additional_description":"Gastroenterology (IBD)","start_date":"2026-02-18T00:00:00","end_date":"2026-02-21T00:00:00","lat":59.3293,"lon":18.0686},
-{"semester":"I","subspecialty":"Healthcare Innovation","location_raw":"Los Angeles","name":"VIVE","full_name":"ViVE – The Healthcare Innovation Conference","additional_description":"Healthcare Innovation","start_date":"2026-02-22T00:00:00","end_date":"2026-02-25T00:00:00","lat":34.0522,"lon":-118.2437},
-{"semester":"I","subspecialty":"Oncology","location_raw":"San Francisco","name":"ASCO GU","full_name":"ASCO Genitourinary (GU) Cancers Symposium","additional_description":"Oncology (Genitourinary)","start_date":"2026-02-26T00:00:00","end_date":"2026-02-28T00:00:00","lat":37.7749,"lon":-122.4194},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Copenhagen","name":"ESGO","full_name":"European Society of Gynaecological Oncology","additional_description":"Gynecologic Oncology","start_date":"2026-02-26T00:00:00","end_date":"2026-02-28T00:00:00","lat":55.6761,"lon":12.5683},
-{"semester":"I","subspecialty":"Rheumatology","location_raw":"Lisabon","name":"SLEuro","full_name":"15th European Lupus Meeting","additional_description":"Rheumatology (Lupus)","start_date":"2026-03-04T00:00:00","end_date":"2026-03-07T00:00:00","lat":38.7223,"lon":-9.1393},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Miami","name":"MBCC","full_name":"Miami Breast Cancer Conference","additional_description":"Oncology (Breast)","start_date":"2026-03-05T00:00:00","end_date":"2026-03-08T00:00:00","lat":25.7617,"lon":-80.1918},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Phoenix","name":"SSO","full_name":"Society of Surgical Oncology","additional_description":"Surgical Oncology","start_date":"2026-03-05T00:00:00","end_date":"2026-03-07T00:00:00","lat":33.4484,"lon":-112.074},
-{"semester":"I","subspecialty":"Neurology","location_raw":"Orlando","name":"MDA","full_name":"Muscular Dystrophy Association","additional_description":"Neurology (Neuromuscular Disorders)","start_date":"2026-03-08T00:00:00","end_date":"2026-03-11T00:00:00","lat":28.5383,"lon":-81.3792},
-{"semester":"I","subspecialty":"Neurology","location_raw":"Budapest","name":"SMA Europe","full_name":"International Scientific Congress on Spinal Muscular Atrophy","additional_description":"Neurology (Neuromuscular Disorders)","start_date":"2026-03-12T00:00:00","end_date":"2026-03-14T00:00:00","lat":47.4979,"lon":19.0402},
-{"semester":"I","subspecialty":"Urology","location_raw":"London","name":"EAU","full_name":"European Association of Urology","additional_description":"Urology","start_date":"2026-03-13T00:00:00","end_date":"2026-03-16T00:00:00","lat":51.5074,"lon":-0.1278},
-{"semester":"I","subspecialty":"Neurology","location_raw":"Copenhagen","name":"AD/PD","full_name":"Alzheimer's Disease & Parkinson's Disease International Conference.","additional_description":"Neurology (Neurodegeneration)","start_date":"2026-03-17T00:00:00","end_date":"2026-03-21T00:00:00","lat":55.6761,"lon":12.5683},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Seville","name":"ICHNO","full_name":"International Congress on Innovative Approaches in Head and Neck Oncology","additional_description":"Oncology (Head & Neck)","start_date":"2026-03-19T00:00:00","end_date":"2026-03-21T00:00:00","lat":37.3891,"lon":-5.9845},
-{"semester":"I","subspecialty":"Ophthalmology","location_raw":"Krakow","name":"COPHy","full_name":"Congress on Controversies in Ophthalmology","additional_description":"Ophthalmology","start_date":"2026-03-20T00:00:00","end_date":"2026-03-21T00:00:00","lat":50.0647,"lon":19.9450},
-{"semester":"I","subspecialty":"Pathology","location_raw":"San Antonio","name":"USCAP","full_name":"United States and Canadian Academy of Pathology","additional_description":"Pathology","start_date":"2026-03-21T00:00:00","end_date":"2026-03-26T00:00:00","lat":29.4241,"lon":-98.4936},
-{"semester":"I","subspecialty":"Hematology","location_raw":"New Orleans","name":"HOPA","full_name":"Hematology/Oncology Pharmacy Association","additional_description":"Hematology-Oncology Pharmacy","start_date":"2026-03-25T00:00:00","end_date":"2026-03-28T00:00:00","lat":29.9511,"lon":-90.0715},
-{"semester":"I","subspecialty":"Psychiatry","location_raw":"Florence","name":"SIRS","full_name":"Schizophrenia International Research Society","additional_description":"Psychiatry (Schizophrenia)","start_date":"2026-03-25T00:00:00","end_date":"2026-03-29T00:00:00","lat":43.7696,"lon":11.2558},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Copenhagen","name":"ELCC","full_name":"European Lung Cancer Congress","additional_description":"Oncology (Lung)","start_date":"2026-03-25T00:00:00","end_date":"2026-03-28T00:00:00","lat":55.6761,"lon":12.5683},
-{"semester":"I","subspecialty":"Dermatology","location_raw":"Denver","name":"AAD","full_name":"American Academy of Dermatology","additional_description":"Dermatology","start_date":"2026-03-27T00:00:00","end_date":"2026-03-31T00:00:00","lat":39.7392,"lon":-104.9903},
-{"semester":"I","subspecialty":"Psychiatry","location_raw":"Prague","name":"EPA","full_name":"European Psychiatric Association","additional_description":"Psychiatry","start_date":"2026-03-28T00:00:00","end_date":"2026-03-31T00:00:00","lat":50.0755,"lon":14.4378},
-{"semester":"I","subspecialty":"Perinatal Medicine","location_raw":"Warsaw","name":"ECPM","full_name":"European Congress of Perinatal Medicine","additional_description":"Perinatal Medicine","start_date":"2026-04-09T00:00:00","end_date":"2026-04-11T00:00:00","lat":52.2297,"lon":21.0122},
-{"semester":"I","subspecialty":"Oncology","location_raw":"San Juan","name":"SGO","full_name":"Society of Gynecologic Oncology","additional_description":"Gynecologic Oncology","start_date":"2026-04-11T00:00:00","end_date":"2026-04-13T00:00:00","lat":18.4655,"lon":-66.1057},
-{"semester":"I","subspecialty":"Cardiology","location_raw":"São Paulo","name":"SOCESP","full_name":"Society of Cardiology of the State of São Paulo","additional_description":"Cardiology","start_date":"2026-04-14T00:00:00","end_date":"2026-04-16T00:00:00","lat":-23.5505,"lon":-46.6333},
-{"semester":"I","subspecialty":"Hematology","location_raw":"New Orleans","name":"HFA","full_name":"Hemophilia Federation of America","additional_description":"Hematology (Hemophilia)","start_date":"2026-04-16T00:00:00","end_date":"2026-04-19T00:00:00","lat":29.9511,"lon":-90.0715},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Paris","name":"EIKCS","full_name":"European International Kidney Cancer Symposium","additional_description":"Oncology (Kidney / GU)","start_date":"2026-04-16T00:00:00","end_date":"2026-04-18T00:00:00","lat":48.8566,"lon":2.3522},
-{"semester":"I","subspecialty":"Infectious Diseases","location_raw":"Munich","name":"ESCMID","full_name":"The European Society of Clinical Microbiology and Infectious Diseases","additional_description":"Infectious Diseases / Microbiology","start_date":"2026-04-17T00:00:00","end_date":"2026-04-21T00:00:00","lat":48.1372,"lon":11.5760},
-{"semester":"I","subspecialty":"Oncology","location_raw":"San Diego","name":"AACR","full_name":"American Association for Cancer Research","additional_description":"Oncology (Cancer Research)","start_date":"2026-04-17T00:00:00","end_date":"2026-04-22T00:00:00","lat":32.7157,"lon":-117.1611},
-{"semester":"I","subspecialty":"Hematology","location_raw":"Kuala Lumpur","name":"WFH","full_name":"The World Federation of Hemophilia","additional_description":"Hematology (Hemophilia)","start_date":"2026-04-19T00:00:00","end_date":"2026-04-22T00:00:00","lat":3.1390,"lon":101.6869},
-{"semester":"I","subspecialty":"Dermatology","location_raw":"Prague","name":"EADO","full_name":"European Association of Dermato-Oncology","additional_description":"Dermato-Oncology","start_date":"2026-04-23T00:00:00","end_date":"2026-04-25T00:00:00","lat":50.0755,"lon":14.4378},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Washington, DC","name":"ONS","full_name":"Oncology Nursing Society","additional_description":"Oncology Nursing","start_date":"2026-04-24T00:00:00","end_date":"2026-04-28T00:00:00","lat":38.9072,"lon":-77.0369},
-{"semester":"I","subspecialty":"Cardiothoracic Transplantation","location_raw":"Toronto","name":"ISHLT","full_name":"International Society for Heart and Lung Transplantation","additional_description":"Cardiothoracic Transplantation","start_date":"2026-04-25T00:00:00","end_date":"2026-04-23T00:00:00","lat":43.6532,"lon":-79.3832},
-{"semester":"I","subspecialty":"Obstetrics & Gynecology","location_raw":"Washington","name":"ACOG","full_name":"American College of Obstetricians and Gynecologists","additional_description":"Obstetrics & Gynecology","start_date":"2026-05-01T00:00:00","end_date":"2026-05-03T00:00:00","lat":38.9072,"lon":-77.0369},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Berlin","name":"ESMO BC","full_name":"ESMO Breast Cancer Congress","additional_description":"Oncology (Breast)","start_date":"2026-05-06T00:00:00","end_date":"2026-05-08T00:00:00","lat":52.52,"lon":13.405},
-{"semester":"I","subspecialty":"Obesity / Metabolic Disorders","location_raw":"Istanbul, Turkey","name":"ECO","full_name":"European Association for the Study of Obesity","additional_description":"Obesity / Metabolic Disorders","start_date":"2026-05-12T00:00:00","end_date":"2026-05-15T00:00:00","lat":41.0082,"lon":28.9784},
-{"semester":"I","subspecialty":"Pulmonology","location_raw":"Orlando","name":"ATS","full_name":"American Thoracic Society","additional_description":"Pulmonology","start_date":"2026-05-15T00:00:00","end_date":"2026-05-20T00:00:00","lat":28.5383,"lon":-81.3792},
-{"semester":"I","subspecialty":"Urology","location_raw":"Washington","name":"AUA","full_name":"American Urological Association","additional_description":"Urology","start_date":"2026-05-15T00:00:00","end_date":"2026-05-18T00:00:00","lat":38.9072,"lon":-77.0369},
-{"semester":"I","subspecialty":"Hepatology","location_raw":"Barcelona","name":"EASL","full_name":"European Association for the Study of the Liver","additional_description":"Hepatology","start_date":"2026-05-27T00:00:00","end_date":"2026-05-30T00:00:00","lat":41.3851,"lon":2.1734},
-{"semester":"I","subspecialty":"Neurology","location_raw":"Charlotte","name":"CMSC","full_name":"Consortium of Multiple Sclerosis Centers","additional_description":"Neurology (Multiple Sclerosis)","start_date":"2026-05-27T00:00:00","end_date":"2026-05-30T00:00:00","lat":35.2271,"lon":-80.8431},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Chicago","name":"ASCO","full_name":"American Society of Clinical Oncology","additional_description":"Oncology","start_date":"2026-05-29T00:00:00","end_date":"2026-06-02T00:00:00","lat":41.8781,"lon":-87.6298},
-{"semester":"I","subspecialty":"Rheumatology","location_raw":"London","name":"EULAR","full_name":"European Congress of Rheumatology","additional_description":"Rheumatology","start_date":"2026-05-30T00:00:00","end_date":"2026-06-01T00:00:00","lat":51.5074,"lon":-0.1278},
-{"semester":"I","subspecialty":"Nephrology","location_raw":"Glasgow","name":"ERA","full_name":"European Renal Association","additional_description":"Nephrology","start_date":"2026-06-03T00:00:00","end_date":"2026-06-06T00:00:00","lat":55.8642,"lon":-4.2518},
-{"semester":"I","subspecialty":"Thoracic Surgery","location_raw":"Athens","name":"ESTS","full_name":"European Conference on General Thoracic Surgery","additional_description":"Thoracic Surgery","start_date":"2026-06-07T00:00:00","end_date":"2026-06-09T00:00:00","lat":37.9838,"lon":23.7275},
-{"semester":"I","subspecialty":"Hematology","location_raw":"Stockholm","name":"EHA","full_name":"European Hematology Association","additional_description":"Hematology","start_date":"2026-06-11T00:00:00","end_date":"2026-06-14T00:00:00","lat":59.3293,"lon":18.0686},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Hong Kong","name":"ESMO Asia","full_name":"ESMO Targeted Anticancer Therapies (TAT) Asia Congress","additional_description":"Oncology","start_date":"2026-06-12T00:00:00","end_date":"2026-06-14T00:00:00","lat":22.3193,"lon":114.1694},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Munich","name":"GAWC","full_name":"Global Academy of Women’s Cancer","additional_description":"Oncology (Women’s Cancer)","start_date":"2026-06-13T00:00:00","end_date":"2026-06-14T00:00:00","lat":48.1372,"lon":11.5760},
-{"semester":"I","subspecialty":"Drug Development / Regulatory Science","location_raw":"Philadelphia","name":"DIA","full_name":"Drug Information Association","additional_description":"Drug Development / Regulatory Science","start_date":"2026-06-14T00:00:00","end_date":"2026-06-18T00:00:00","lat":39.9526,"lon":-75.1652},
-{"semester":"I","subspecialty":"Healthcare Innovation","location_raw":"Amsterdam","name":"HLTH Europe","full_name":"HLTH Europe: The Premier Healthcare Innovation Event in Europe","additional_description":"Healthcare Innovation","start_date":"2026-06-15T00:00:00","end_date":"2026-06-18T00:00:00","lat":52.3676,"lon":4.9041},
-{"semester":"I","subspecialty":"Oncology","location_raw":"Lugano","name":"ICML","full_name":"International Conference on Malignant Lymphoma","additional_description":"Oncology (Lymphoma)","start_date":"2026-06-17T00:00:00","end_date":"2026-06-21T00:00:00","lat":46.0037,"lon":8.9511},
-{"semester":"I","subspecialty":"Pediatric","location_raw":"Lille","name":"ESPGHAN","full_name":"European Society for Paediatric Gastroenterology, Hepatology and Nutrition","additional_description":"Pediatric Gastroenterology / Hepatology / Nutrition","start_date":"2026-06-24T00:00:00","end_date":"2026-06-27T00:00:00","lat":50.6292,"lon":3.0573},
-{"semester":"I","subspecialty":"Neurology","location_raw":"Orlando","name":"CureSMA","full_name":"Annual SMA Research & Clinical Care Meeting","additional_description":"Neurology (Neuromuscular Disorders)","start_date":"2026-06-26T00:00:00","end_date":"2026-06-29T00:00:00","lat":28.5383,"lon":-81.3792},
-{"semester":"I","subspecialty":"Neurology","location_raw":"Geneva","name":"EAN","full_name":"European Academy of Neurology","additional_description":"Neurology","start_date":"2026-06-27T00:00:00","end_date":"2026-06-30T00:00:00","lat":46.2044,"lon":6.1432},
-{"semester":"II","subspecialty":"Oncology","location_raw":"Munich","name":"ESMO GI","full_name":"ESMO Gastrointestinal Cancers Congress","additional_description":"Oncology (Gastrointestinal)","start_date":"2026-07-01T00:00:00","end_date":"2026-07-04T00:00:00","lat":48.1372,"lon":11.5760},
-{"semester":"II","subspecialty":"Hematology","location_raw":"Paris","name":"ISTH","full_name":"International Society on Thrombosis and Haemostasis","additional_description":"Hematology (Thrombosis & Hemostasis)","start_date":"2026-07-11T00:00:00","end_date":"2026-07-15T00:00:00","lat":48.8566,"lon":2.3522},
-{"semester":"II","subspecialty":"Cardiology","location_raw":"Munich","name":"ESC","full_name":"European Society of Cardiology","additional_description":"Cardiology","start_date":"2026-08-28T00:00:00","end_date":"2026-08-31T00:00:00","lat":48.1372,"lon":11.5760},
-{"semester":"II","subspecialty":"Ophthalmology","location_raw":"Queensland","name":"APVRS","full_name":"Asia-Pacific Vitreo-retina Society","additional_description":"Ophthalmology (Retina)","start_date":"2026-08-28T00:00:00","end_date":"2026-08-30T00:00:00","lat":-20.9176,"lon":142.7028},
-{"semester":"II","subspecialty":"Infectious Diseases","location_raw":"Lisabon","name":"ESWI","full_name":"World One Health Congress","additional_description":"Infectious Diseases / Public Health","start_date":"2026-09-04T00:00:00","end_date":"2026-09-07T00:00:00","lat":38.7223,"lon":-9.1393},
-{"semester":"II","subspecialty":"Pulmonology","location_raw":"Barcelona","name":"ERS","full_name":"European Respiratory Society","additional_description":"Pulmonology","start_date":"2026-09-05T00:00:00","end_date":"2026-09-09T00:00:00","lat":41.3851,"lon":2.1734},
-{"semester":"II","subspecialty":"Pediatric","location_raw":"Marseilles","name":"ESPE","full_name":"European Society for Paediatric Endocrinology","additional_description":"Pediatric Endocrinology","start_date":"2026-09-08T00:00:00","end_date":"2026-09-10T00:00:00","lat":43.2965,"lon":5.3698},
-{"semester":"II","subspecialty":"Oncology","location_raw":"Seoul","name":"WCLC/IASL","full_name":"World Conference on Lung Cancer","additional_description":"Oncology (Lung Cancer)","start_date":"2026-09-12T00:00:00","end_date":"2026-09-15T00:00:00","lat":37.5665,"lon":126.9780},
-{"semester":"II","subspecialty":"Neurology","location_raw":"Hiroshima","name":"WMS","full_name":"World Muscle Society","additional_description":"Neurology (Neuromuscular Disorders)","start_date":"2026-09-29T00:00:00","end_date":"2026-10-03T00:00:00","lat":34.3853,"lon":132.4553},
-{"semester":"II","subspecialty":"Ophthalmology","location_raw":"Vienna","name":"EURETINA","full_name":"European Society of Retina Specialists","additional_description":"Ophthalmology (Retina)","start_date":"2026-10-01T00:00:00","end_date":"2026-10-04T00:00:00","lat":48.2082,"lon":16.3738},
-{"semester":"II","subspecialty":"Neurology","location_raw":"Seoul","name":"MDS","full_name":"International Parkinson and Movement Disorder Society","additional_description":"Neurology (Movement Disorders)","start_date":"2026-10-04T00:00:00","end_date":"2026-10-08T00:00:00","lat":37.5665,"lon":126.9780},
-{"semester":"II","subspecialty":"Hematology","location_raw":"Vienna","name":"DGHO","full_name":"German, Austrian and Swiss Societies of Hematology and Medical Oncology","additional_description":"Hematology / Oncology","start_date":"2026-10-09T00:00:00","end_date":"2026-10-12T00:00:00","lat":48.2082,"lon":16.3738},
-{"semester":"II","subspecialty":"Pediatric","location_raw":"Thessaloniki","name":"EPNS","full_name":"European Paediatric Neurology Society","additional_description":"Pediatric Neurology","start_date":"2026-10-16T00:00:00","end_date":"2026-10-17T00:00:00","lat":40.6401,"lon":22.9444},
-{"semester":"II","subspecialty":"Gastroenterology","location_raw":"TBA","name":"UEGW","full_name":"United European Gastroenterology","additional_description":"Gastroenterology","start_date":"2026-10-17T00:00:00","end_date":"2026-10-20T00:00:00","lat":0,"lon":0},
-{"semester":"II","subspecialty":"Oncology","location_raw":"Madrid","name":"ESMO","full_name":"European Society for Medical Oncology","additional_description":"Oncology","start_date":"2026-10-23T00:00:00","end_date":"2026-10-27T00:00:00","lat":40.4168,"lon":-3.7038},
-{"semester":"II","subspecialty":"Allergy / Immunology","location_raw":"Phoenix","name":"ACAAI","full_name":"American College of Allergy, Asthma and Immunology","additional_description":"Allergy / Immunology","start_date":"2026-11-12T00:00:00","end_date":"2026-11-16T00:00:00","lat":33.4484,"lon":-112.074},
-{"semester":"II","subspecialty":"Healthcare Innovation","location_raw":"Las Vegas","name":"HLTH USA","full_name":"HLTH USA","additional_description":"Healthcare Innovation","start_date":"2026-11-15T00:00:00","end_date":"2026-11-18T00:00:00","lat":36.1699,"lon":-115.1398}];
+  // ======= Your prepared data (FULL, unchanged) =======
+  const DATA = [{"semester":"I","subspecialty":"Oncology","location_raw":"San Francisco","name":"ASCO GI","full_name":"ASCO Gastrointestinal (GI) Cancers Symposium","additional_description":"Oncology (Gastrointestinal)","start_date":"2026-01-08T00:00:00","end_date":"2026-01-10T00:00:00","lat":37.7749,"lon":-122.4194}, {"semester":"I","subspecialty":"Hepatology","location_raw":"Edinburgh","name":"EASL-LCS","full_name":"EASL Liver Cancer Summit","additional_description":"Hepatology / Liver Cancer","start_date":"2026-01-22T00:00:00","end_date":"2026-01-24T00:00:00","lat":55.9533,"lon":-3.1883}, {"semester":"I","subspecialty":"Hematology","location_raw":"Dublin","name":"EAHAD","full_name":"European Association for Haemophilia and Allied Disorders","additional_description":"Hematology (Hemophilia)","start_date":"2026-02-03T00:00:00","end_date":"2026-02-06T00:00:00","lat":53.3498,"lon":-6.2603}, {"semester":"I","subspecialty":"Hematology","location_raw":"Salt Lake City","name":"ASTCT/CIBMTR","full_name":"American Society for Transplantation and Cellular Therapy /Center for International Blood and Marrow Transplant Research","additional_description":"Hematology / Transplantation","start_date":"2026-02-04T00:00:00","end_date":"2026-02-07T00:00:00","lat":40.7608,"lon":-111.891}, {"semester":"I","subspecialty":"Neurology","location_raw":"San Diego","name":"ACTRIMS Forum","full_name":"Americas Committee for Treatment and Research in Multiple Sclerosis","additional_description":"Neurology (Multiple Sclerosis)","start_date":"2026-02-05T00:00:00","end_date":"2026-02-07T00:00:00","lat":32.7157,"lon":-117.1611}, {"semester":"I","subspecialty":"Ophthalmology","location_raw":"Hong Kong","name":"APAO","full_name":"Asia-Pacific Academy of Ophthalmology","additional_description":"Ophthalmology","start_date":"2026-02-05T00:00:00","end_date":"2026-02-08T00:00:00","lat":22.3193,"lon":114.1694}, {"semester":"I","subspecialty":"Gastroenterology","location_raw":"Stockholm","name":"ECCO","full_name":"European Crohn’s and Colitis Organisation","additional_description":"Gastroenterology (IBD)","start_date":"2026-02-18T00:00:00","end_date":"2026-02-21T00:00:00","lat":59.3293,"lon":18.0686}, {"semester":"I","subspecialty":"Healthcare Innovation","location_raw":"Los Angeles","name":"VIVE","full_name":"ViVE – The Healthcare Innovation Conference","additional_description":"Healthcare Innovation","start_date":"2026-02-22T00:00:00","end_date":"2026-02-25T00:00:00","lat":34.0522,"lon":-118.2437}, {"semester":"I","subspecialty":"Oncology","location_raw":"San Francisco","name":"ASCO GU","full_name":"ASCO Genitourinary (GU) Cancers Symposium","additional_description":"Oncology (Genitourinary)","start_date":"2026-02-26T00:00:00","end_date":"2026-02-28T00:00:00","lat":37.7749,"lon":-122.4194}, {"semester":"I","subspecialty":"Oncology","location_raw":"Copenhagen","name":"ESGO","full_name":"European Society of Gynaecological Oncology","additional_description":"Gynecologic Oncology","start_date":"2026-02-26T00:00:00","end_date":"2026-02-28T00:00:00","lat":55.6761,"lon":12.5683}, {"semester":"I","subspecialty":"Rheumatology","location_raw":"Lisabon","name":"SLEuro","full_name":"15th European Lupus Meeting","additional_description":"Rheumatology (Lupus)","start_date":"2026-03-04T00:00:00","end_date":"2026-03-07T00:00:00","lat":38.7223,"lon":-9.1393}, {"semester":"I","subspecialty":"Oncology","location_raw":"Miami","name":"MBCC","full_name":"Miami Breast Cancer Conference","additional_description":"Oncology (Breast)","start_date":"2026-03-05T00:00:00","end_date":"2026-03-08T00:00:00","lat":25.7617,"lon":-80.1918}, {"semester":"I","subspecialty":"Oncology","location_raw":"Phoenix","name":"SSO","full_name":"Society of Surgical Oncology","additional_description":"Surgical Oncology","start_date":"2026-03-05T00:00:00","end_date":"2026-03-07T00:00:00","lat":33.4484,"lon":-112.074}, {"semester":"I","subspecialty":"Neurology","location_raw":"Orlando","name":"MDA","full_name":"Muscular Dystrophy Association","additional_description":"Neurology (Neuromuscular Disorders)","start_date":"2026-03-08T00:00:00","end_date":"2026-03-11T00:00:00","lat":28.5383,"lon":-81.3792}, {"semester":"I","subspecialty":"Neurology","location_raw":"Budapest","name":"SMA Europe","full_name":"International Scientific Congress on Spinal Muscular Atrophy","additional_description":"Neurology (Neuromuscular Disorders)","start_date":"2026-03-12T00:00:00","end_date":"2026-03-14T00:00:00","lat":47.4979,"lon":19.0402}, {"semester":"I","subspecialty":"Urology","location_raw":"London","name":"EAU","full_name":"European Association of Urology","additional_description":"Urology","start_date":"2026-03-13T00:00:00","end_date":"2026-03-16T00:00:00","lat":51.5074,"lon":-0.1278}, {"semester":"I","subspecialty":"Neurology","location_raw":"Copenhagen","name":"AD/PD","full_name":"Alzheimer's Disease & Parkinson's Disease International Conference.","additional_description":"Neurology (Neurodegeneration)","start_date":"2026-03-17T00:00:00","end_date":"2026-03-21T00:00:00","lat":55.6761,"lon":12.5683}, {"semester":"I","subspecialty":"Oncology","location_raw":"Seville","name":"ICHNO","full_name":"International Congress on Innovative Approaches in Head and Neck Oncology","additional_description":"Oncology (Head & Neck)","start_date":"2026-03-19T00:00:00","end_date":"2026-03-21T00:00:00","lat":37.3891,"lon":-5.9845}, {"semester":"I","subspecialty":"Ophthalmology","location_raw":"Krakow","name":"COPHy","full_name":"Congress on Controversies in Ophthalmology","additional_description":"Ophthalmology","start_date":"2026-03-20T00:00:00","end_date":"2026-03-21T00:00:00","lat":50.0647,"lon":19.9450}, {"semester":"I","subspecialty":"Pathology","location_raw":"San Antonio","name":"USCAP","full_name":"United States and Canadian Academy of Pathology","additional_description":"Pathology","start_date":"2026-03-21T00:00:00","end_date":"2026-03-26T00:00:00","lat":29.4241,"lon":-98.4936}, {"semester":"I","subspecialty":"Hematology","location_raw":"New Orleans","name":"HOPA","full_name":"Hematology/Oncology Pharmacy Association","additional_description":"Hematology-Oncology Pharmacy","start_date":"2026-03-25T00:00:00","end_date":"2026-03-28T00:00:00","lat":29.9511,"lon":-90.0715}, {"semester":"I","subspecialty":"Psychiatry","location_raw":"Florence","name":"SIRS","full_name":"Schizophrenia International Research Society","additional_description":"Psychiatry (Schizophrenia)","start_date":"2026-03-25T00:00:00","end_date":"2026-03-29T00:00:00","lat":43.7696,"lon":11.2558}, {"semester":"I","subspecialty":"Oncology","location_raw":"Copenhagen","name":"ELCC","full_name":"European Lung Cancer Congress","additional_description":"Oncology (Lung)","start_date":"2026-03-25T00:00:00","end_date":"2026-03-28T00:00:00","lat":55.6761,"lon":12.5683}, {"semester":"I","subspecialty":"Dermatology","location_raw":"Denver","name":"AAD","full_name":"American Academy of Dermatology","additional_description":"Dermatology","start_date":"2026-03-27T00:00:00","end_date":"2026-03-31T00:00:00","lat":39.7392,"lon":-104.9903}, {"semester":"I","subspecialty":"Psychiatry","location_raw":"Prague","name":"EPA","full_name":"European Psychiatric Association","additional_description":"Psychiatry","start_date":"2026-03-28T00:00:00","end_date":"2026-03-31T00:00:00","lat":50.0755,"lon":14.4378}, {"semester":"I","subspecialty":"Perinatal Medicine","location_raw":"Warsaw","name":"ECPM","full_name":"European Congress of Perinatal Medicine","additional_description":"Perinatal Medicine","start_date":"2026-04-09T00:00:00","end_date":"2026-04-11T00:00:00","lat":52.2297,"lon":21.0122}, {"semester":"I","subspecialty":"Oncology","location_raw":"San Juan","name":"SGO","full_name":"Society of Gynecologic Oncology","additional_description":"Gynecologic Oncology","start_date":"2026-04-11T00:00:00","end_date":"2026-04-13T00:00:00","lat":18.4655,"lon":-66.1057}, {"semester":"I","subspecialty":"Cardiology","location_raw":"São Paulo","name":"SOCESP","full_name":"Society of Cardiology of the State of São Paulo","additional_description":"Cardiology","start_date":"2026-04-14T00:00:00","end_date":"2026-04-16T00:00:00","lat":-23.5505,"lon":-46.6333}, {"semester":"I","subspecialty":"Hematology","location_raw":"New Orleans","name":"HFA","full_name":"Hemophilia Federation of America","additional_description":"Hematology (Hemophilia)","start_date":"2026-04-16T00:00:00","end_date":"2026-04-19T00:00:00","lat":29.9511,"lon":-90.0715}, {"semester":"I","subspecialty":"Oncology","location_raw":"Paris","name":"EIKCS","full_name":"European International Kidney Cancer Symposium","additional_description":"Oncology (Kidney / GU)","start_date":"2026-04-16T00:00:00","end_date":"2026-04-18T00:00:00","lat":48.8566,"lon":2.3522}, {"semester":"I","subspecialty":"Infectious Diseases","location_raw":"Munich","name":"ESCMID","full_name":"The European Society of Clinical Microbiology and Infectious Diseases","additional_description":"Infectious Diseases / Microbiology","start_date":"2026-04-17T00:00:00","end_date":"2026-04-21T00:00:00","lat":48.1372,"lon":11.5760}, {"semester":"I","subspecialty":"Oncology","location_raw":"San Diego","name":"AACR","full_name":"American Association for Cancer Research","additional_description":"Oncology (Cancer Research)","start_date":"2026-04-17T00:00:00","end_date":"2026-04-22T00:00:00","lat":32.7157,"lon":-117.1611}, {"semester":"I","subspecialty":"Hematology","location_raw":"Kuala Lumpur","name":"WFH","full_name":"The World Federation of Hemophilia","additional_description":"Hematology (Hemophilia)","start_date":"2026-04-19T00:00:00","end_date":"2026-04-22T00:00:00","lat":3.1390,"lon":101.6869}, {"semester":"I","subspecialty":"Dermatology","location_raw":"Prague","name":"EADO","full_name":"European Association of Dermato-Oncology","additional_description":"Dermato-Oncology","start_date":"2026-04-23T00:00:00","end_date":"2026-04-25T00:00:00","lat":50.0755,"lon":14.4378}, {"semester":"I","subspecialty":"Oncology","location_raw":"Washington, DC","name":"ONS","full_name":"Oncology Nursing Society","additional_description":"Oncology Nursing","start_date":"2026-04-24T00:00:00","end_date":"2026-04-28T00:00:00","lat":38.9072,"lon":-77.0369}, {"semester":"I","subspecialty":"Cardiothoracic Transplantation","location_raw":"Toronto","name":"ISHLT","full_name":"International Society for Heart and Lung Transplantation","additional_description":"Cardiothoracic Transplantation","start_date":"2026-04-25T00:00:00","end_date":"2026-04-23T00:00:00","lat":43.6532,"lon":-79.3832}, {"semester":"I","subspecialty":"Obstetrics & Gynecology","location_raw":"Washington","name":"ACOG","full_name":"American College of Obstetricians and Gynecologists","additional_description":"Obstetrics & Gynecology","start_date":"2026-05-01T00:00:00","end_date":"2026-05-03T00:00:00","lat":38.9072,"lon":-77.0369}, {"semester":"I","subspecialty":"Oncology","location_raw":"Berlin","name":"ESMO BC","full_name":"ESMO Breast Cancer Congress","additional_description":"Oncology (Breast)","start_date":"2026-05-06T00:00:00","end_date":"2026-05-08T00:00:00","lat":52.52,"lon":13.405}, {"semester":"I","subspecialty":"Obesity / Metabolic Disorders","location_raw":"Istanbul, Turkey","name":"ECO","full_name":"European Association for the Study of Obesity","additional_description":"Obesity / Metabolic Disorders","start_date":"2026-05-12T00:00:00","end_date":"2026-05-15T00:00:00","lat":41.0082,"lon":28.9784}, {"semester":"I","subspecialty":"Pulmonology","location_raw":"Orlando","name":"ATS","full_name":"American Thoracic Society","additional_description":"Pulmonology","start_date":"2026-05-15T00:00:00","end_date":"2026-05-20T00:00:00","lat":28.5383,"lon":-81.3792}, {"semester":"I","subspecialty":"Urology","location_raw":"Washington","name":"AUA","full_name":"American Urological Association","additional_description":"Urology","start_date":"2026-05-15T00:00:00","end_date":"2026-05-18T00:00:00","lat":38.9072,"lon":-77.0369}, {"semester":"I","subspecialty":"Hepatology","location_raw":"Barcelona","name":"EASL","full_name":"European Association for the Study of the Liver","additional_description":"Hepatology","start_date":"2026-05-27T00:00:00","end_date":"2026-05-30T00:00:00","lat":41.3851,"lon":2.1734}, {"semester":"I","subspecialty":"Neurology","location_raw":"Charlotte","name":"CMSC","full_name":"Consortium of Multiple Sclerosis Centers","additional_description":"Neurology (Multiple Sclerosis)","start_date":"2026-05-27T00:00:00","end_date":"2026-05-30T00:00:00","lat":35.2271,"lon":-80.8431}, {"semester":"I","subspecialty":"Oncology","location_raw":"Chicago","name":"ASCO","full_name":"American Society of Clinical Oncology","additional_description":"Oncology","start_date":"2026-05-29T00:00:00","end_date":"2026-06-02T00:00:00","lat":41.8781,"lon":-87.6298}, {"semester":"I","subspecialty":"Rheumatology","location_raw":"London","name":"EULAR","full_name":"European Congress of Rheumatology","additional_description":"Rheumatology","start_date":"2026-05-30T00:00:00","end_date":"2026-06-01T00:00:00","lat":51.5074,"lon":-0.1278}, {"semester":"I","subspecialty":"Nephrology","location_raw":"Glasgow","name":"ERA","full_name":"European Renal Association","additional_description":"Nephrology","start_date":"2026-06-03T00:00:00","end_date":"2026-06-06T00:00:00","lat":55.8642,"lon":-4.2518}, {"semester":"I","subspecialty":"Thoracic Surgery","location_raw":"Athens","name":"ESTS","full_name":"European Conference on General Thoracic Surgery","additional_description":"Thoracic Surgery","start_date":"2026-06-07T00:00:00","end_date":"2026-06-09T00:00:00","lat":37.9838,"lon":23.7275}, {"semester":"I","subspecialty":"Hematology","location_raw":"Stockholm","name":"EHA","full_name":"European Hematology Association","additional_description":"Hematology","start_date":"2026-06-11T00:00:00","end_date":"2026-06-14T00:00:00","lat":59.3293,"lon":18.0686}, {"semester":"I","subspecialty":"Oncology","location_raw":"Hong Kong","name":"ESMO Asia","full_name":"ESMO Targeted Anticancer Therapies (TAT) Asia Congress","additional_description":"Oncology","start_date":"2026-06-12T00:00:00","end_date":"2026-06-14T00:00:00","lat":22.3193,"lon":114.1694}, {"semester":"I","subspecialty":"Oncology","location_raw":"Munich","name":"GAWC","full_name":"Global Academy of Women’s Cancer","additional_description":"Oncology (Women’s Cancer)","start_date":"2026-06-13T00:00:00","end_date":"2026-06-14T00:00:00","lat":48.1372,"lon":11.5760}, {"semester":"I","subspecialty":"Drug Development / Regulatory Science","location_raw":"Philadelphia","name":"DIA","full_name":"Drug Information Association","additional_description":"Drug Development / Regulatory Science","start_date":"2026-06-14T00:00:00","end_date":"2026-06-18T00:00:00","lat":39.9526,"lon":-75.1652}, {"semester":"I","subspecialty":"Healthcare Innovation","location_raw":"Amsterdam","name":"HLTH Europe","full_name":"HLTH Europe: The Premier Healthcare Innovation Event in Europe","additional_description":"Healthcare Innovation","start_date":"2026-06-15T00:00:00","end_date":"2026-06-18T00:00:00","lat":52.3676,"lon":4.9041}, {"semester":"I","subspecialty":"Oncology","location_raw":"Lugano","name":"ICML","full_name":"International Conference on Malignant Lymphoma","additional_description":"Oncology (Lymphoma)","start_date":"2026-06-17T00:00:00","end_date":"2026-06-21T00:00:00","lat":46.0037,"lon":8.9511}, {"semester":"I","subspecialty":"Pediatric","location_raw":"Lille","name":"ESPGHAN","full_name":"European Society for Paediatric Gastroenterology, Hepatology and Nutrition","additional_description":"Pediatric Gastroenterology / Hepatology / Nutrition","start_date":"2026-06-24T00:00:00","end_date":"2026-06-27T00:00:00","lat":50.6292,"lon":3.0573}, {"semester":"I","subspecialty":"Neurology","location_raw":"Orlando","name":"CureSMA","full_name":"Annual SMA Research & Clinical Care Meeting","additional_description":"Neurology (Neuromuscular Disorders)","start_date":"2026-06-26T00:00:00","end_date":"2026-06-29T00:00:00","lat":28.5383,"lon":-81.3792}, {"semester":"I","subspecialty":"Neurology","location_raw":"Geneva","name":"EAN","full_name":"European Academy of Neurology","additional_description":"Neurology","start_date":"2026-06-27T00:00:00","end_date":"2026-06-30T00:00:00","lat":46.2044,"lon":6.1432}, {"semester":"II","subspecialty":"Oncology","location_raw":"Munich","name":"ESMO GI","full_name":"ESMO Gastrointestinal Cancers Congress","additional_description":"Oncology (Gastrointestinal)","start_date":"2026-07-01T00:00:00","end_date":"2026-07-04T00:00:00","lat":48.1372,"lon":11.5760}, {"semester":"II","subspecialty":"Hematology","location_raw":"Paris","name":"ISTH","full_name":"International Society on Thrombosis and Haemostasis","additional_description":"Hematology (Thrombosis & Hemostasis)","start_date":"2026-07-11T00:00:00","end_date":"2026-07-15T00:00:00","lat":48.8566,"lon":2.3522}, {"semester":"II","subspecialty":"Cardiology","location_raw":"Munich","name":"ESC","full_name":"European Society of Cardiology","additional_description":"Cardiology","start_date":"2026-08-28T00:00:00","end_date":"2026-08-31T00:00:00","lat":48.1372,"lon":11.5760}, {"semester":"II","subspecialty":"Ophthalmology","location_raw":"Queensland","name":"APVRS","full_name":"Asia-Pacific Vitreo-retina Society","additional_description":"Ophthalmology (Retina)","start_date":"2026-08-28T00:00:00","end_date":"2026-08-30T00:00:00","lat":-20.9176,"lon":142.7028}, {"semester":"II","subspecialty":"Infectious Diseases","location_raw":"Lisabon","name":"ESWI","full_name":"World One Health Congress","additional_description":"Infectious Diseases / Public Health","start_date":"2026-09-04T00:00:00","end_date":"2026-09-07T00:00:00","lat":38.7223,"lon":-9.1393}, {"semester":"II","subspecialty":"Pulmonology","location_raw":"Barcelona","name":"ERS","full_name":"European Respiratory Society","additional_description":"Pulmonology","start_date":"2026-09-05T00:00:00","end_date":"2026-09-09T00:00:00","lat":41.3851,"lon":2.1734}, {"semester":"II","subspecialty":"Pediatric","location_raw":"Marseilles","name":"ESPE","full_name":"European Society for Paediatric Endocrinology","additional_description":"Pediatric Endocrinology","start_date":"2026-09-08T00:00:00","end_date":"2026-09-10T00:00:00","lat":43.2965,"lon":5.3698}, {"semester":"II","subspecialty":"Oncology","location_raw":"Seoul","name":"WCLC/IASL","full_name":"World Conference on Lung Cancer","additional_description":"Oncology (Lung Cancer)","start_date":"2026-09-12T00:00:00","end_date":"2026-09-15T00:00:00","lat":37.5665,"lon":126.9780}, {"semester":"II","subspecialty":"Neurology","location_raw":"Hiroshima","name":"WMS","full_name":"World Muscle Society","additional_description":"Neurology (Neuromuscular Disorders)","start_date":"2026-09-29T00:00:00","end_date":"2026-10-03T00:00:00","lat":34.3853,"lon":132.4553}, {"semester":"II","subspecialty":"Ophthalmology","location_raw":"Vienna","name":"EURETINA","full_name":"European Society of Retina Specialists","additional_description":"Ophthalmology (Retina)","start_date":"2026-10-01T00:00:00","end_date":"2026-10-04T00:00:00","lat":48.2082,"lon":16.3738}, {"semester":"II","subspecialty":"Neurology","location_raw":"Seoul","name":"MDS","full_name":"International Parkinson and Movement Disorder Society","additional_description":"Neurology (Movement Disorders)","start_date":"2026-10-04T00:00:00","end_date":"2026-10-08T00:00:00","lat":37.5665,"lon":126.9780}, {"semester":"II","subspecialty":"Hematology","location_raw":"Vienna","name":"DGHO","full_name":"German, Austrian and Swiss Societies of Hematology and Medical Oncology","additional_description":"Hematology / Oncology","start_date":"2026-10-09T00:00:00","end_date":"2026-10-12T00:00:00","lat":48.2082,"lon":16.3738}, {"semester":"II","subspecialty":"Pediatric","location_raw":"Thessaloniki","name":"EPNS","full_name":"European Paediatric Neurology Society","additional_description":"Pediatric Neurology","start_date":"2026-10-16T00:00:00","end_date":"2026-10-17T00:00:00","lat":40.6401,"lon":22.9444}, {"semester":"II","subspecialty":"Gastroenterology","location_raw":"TBA","name":"UEGW","full_name":"United European Gastroenterology","additional_description":"Gastroenterology","start_date":"2026-10-17T00:00:00","end_date":"2026-10-20T00:00:00","lat":0,"lon":0}, {"semester":"II","subspecialty":"Oncology","location_raw":"Madrid","name":"ESMO","full_name":"European Society for Medical Oncology","additional_description":"Oncology","start_date":"2026-10-23T00:00:00","end_date":"2026-10-27T00:00:00","lat":40.4168,"lon":-3.7038}, {"semester":"II","subspecialty":"Allergy / Immunology","location_raw":"Phoenix","name":"ACAAI","full_name":"American College of Allergy, Asthma and Immunology","additional_description":"Allergy / Immunology","start_date":"2026-11-12T00:00:00","end_date":"2026-11-16T00:00:00","lat":33.4484,"lon":-112.074}, {"semester":"II","subspecialty":"Healthcare Innovation","location_raw":"Las Vegas","name":"HLTH USA","full_name":"HLTH USA","additional_description":"Healthcare Innovation","start_date":"2026-11-15T00:00:00","end_date":"2026-11-18T00:00:00","lat":36.1699,"lon":-115.1398}];
 
   // ======= Map init =======
   const map = L.map('map', { worldCopyJump: true }).setView([20, 0], 2);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
 
   // ======= Marker color palette and mapping =======
   const COLOR_NAMES = ['blue','red','green','orange','gold','violet','grey','black'];
-  const ICONS = new Map();        // subspecialty -> L.Icon
-  const COLORS = new Map();       // subspecialty -> color name
+  const ICONS = new Map();     // subspecialty -> L.Icon
+  const COLORS = new Map();    // subspecialty -> color name
   const COLOR_URL = color => `https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-${color}.png`;
   const SHADOW_URL = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png';
   let colorIndex = 0;
-
   function getIconFor(sub) {
     if (ICONS.has(sub)) return ICONS.get(sub);
     const color = COLOR_NAMES[colorIndex++ % COLOR_NAMES.length];
@@ -146,6 +105,7 @@
   function formatDate(iso) {
     if (!iso) return '';
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
     return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
   }
   function safeText(v, fallback='') {
@@ -153,9 +113,7 @@
     const s = String(v);
     return (s.toLowerCase() === 'nan') ? fallback : s;
   }
-
   async function geocode(location) {
-    // Fallback if no coords; for privacy/rate limits, this is basic
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1&accept-language=en`;
     const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
     const arr = await res.json();
@@ -164,7 +122,6 @@
     }
     return { lat:null, lon:null };
   }
-
   function popupHTML(it) {
     const name = safeText(it.name) || safeText(it.full_name) || 'Conference';
     const full = safeText(it.full_name) || name;
@@ -172,17 +129,13 @@
     const desc = safeText(it.additional_description) || '';
     const sd = formatDate(it.start_date);
     const ed = formatDate(it.end_date);
-
-    // spacing exactly with <br><br> as requested + link at bottom
-    return `
-      <div class="popup-content">
-        <b>${name}</b><br><br>
-        (${safeText(it.name) || name}) ${full} in ${loc},<br><br>
-        ${desc || ''}${desc ? '<br><br>' : ''}
-        ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
-        <a href="https://abtscs.com/" target="_blank" rel="noopener">https://abtscs.com/</a>
-      </div>
-    `;
+    return `<div class="popup-content">
+      <b>${name}</b><br><br>
+      (${safeText(it.name) || name}) ${full} in ${loc},<br><br>
+      ${desc ? `${desc}<br><br>` : ''}
+      ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
+      <a href="https://abtscs.com/" target="_blank" rel="noopener">https://abtscs.com/</a>
+    </div>`;
   }
 
   // ======= Group by semester + subspecialty =======
@@ -202,8 +155,10 @@
       const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
       const label = document.createElement('label');
       const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.id = id;
-      label.appendChild(cb); label.append(' ', sub);
+      cb.type = 'checkbox';
+      cb.id = id;
+      label.appendChild(cb);
+      label.append(' ', sub);
       container.appendChild(label);
     }
   }
@@ -213,13 +168,9 @@
   // ======= Build legend (assigns colors up front for consistency) =======
   function buildLegend() {
     const legend = document.getElementById('legend-items');
-    const subsSet = new Set([
-      ...Array.from(bySemester.I.keys()),
-      ...Array.from(bySemester.II.keys())
-    ]);
+    const subsSet = new Set([ ...Array.from(bySemester.I.keys()), ...Array.from(bySemester.II.keys()) ]);
     const subs = Array.from(subsSet).sort();
     for (const sub of subs) {
-      // Ensure color assignment
       const icon = getIconFor(sub);
       const color = COLORS.get(sub);
       const row = document.createElement('div');
@@ -237,22 +188,22 @@
   buildLegend();
 
   // ======= Markers + wiring =======
-  const markerGroups = new Map();    // key: semId__sub -> markers[]
-  const visibleMarkers = new Set();  // track currently visible markers
+  const markerGroups = new Map(); // key: semId__sub -> markers[]
+  const visibleMarkers = new Set(); // track currently on-map markers
 
   async function ensureMarker(it, icon) {
-    // Prefer embedded coords; fall back to geocoding when missing
+    // Use given coords; if missing, fallback to geocoding
     let lat = (typeof it.lat === 'number') ? it.lat : null;
     let lon = (typeof it.lon === 'number') ? it.lon : null;
-
     if ((lat == null || lon == null) && (it.location_normalized || it.location_raw)) {
       const q = it.location_normalized || it.location_raw;
       const res = await geocode(q);
       lat = res.lat; lon = res.lon;
     }
     if (lat == null || lon == null) return null;
-
-    return L.marker([lat, lon], { icon }).bindPopup(popupHTML(it));
+    const m = L.marker([lat, lon], { icon }).bindPopup(popupHTML(it));
+    m._confData = it;
+    return m;
   }
 
   async function toggleSet(checked, semKey, sub, items) {
@@ -261,11 +212,11 @@
     const arr = markerGroups.get(key);
 
     if (!checked) {
-      // remove from map and visible set
       for (const m of arr) {
         if (map.hasLayer(m)) map.removeLayer(m);
         visibleMarkers.delete(m);
       }
+      updateBottomPanel();
       return;
     }
 
@@ -277,32 +228,65 @@
       }
     }
 
-    // Add to map & track
     for (const m of arr) {
       m.addTo(map);
       visibleMarkers.add(m);
     }
 
-    // Fit bounds only if this group has 2+ pins (your request)
-    // If exactly 1 pin, keep the world view (no zoom).
-    if (arr.length >= 2) {
-      let bounds = null;
-      for (const m of arr) {
-        bounds = bounds ? bounds.extend(m.getLatLng()) : L.latLngBounds(m.getLatLng(), m.getLatLng());
+    // IMPORTANT: do NOT auto-zoom when there are 2+ pins (per your request).
+    // Also leaving zoom unchanged for a single pin.
+    updateBottomPanel();
+  }
+
+  function updateBottomPanel() {
+    const panel = document.getElementById('bottom-panel');
+    panel.innerHTML = '';
+    const bounds = map.getBounds();
+    // Collect markers that are currently on the map *and* inside viewport
+    const cards = [];
+    visibleMarkers.forEach(m => {
+      if (map.hasLayer(m) && bounds.contains(m.getLatLng())) {
+        const it = m._confData;
+        const el = document.createElement('div');
+        el.className = 'conf-card';
+        el.innerHTML = `
+          <div class="conf-title">${safeText(it.name) || 'Conference'}</div>
+          <div class="conf-meta">${safeText(it.location_raw) || 'TBA'}</div>
+          <div class="conf-meta">${formatDate(it.start_date)}${it.end_date ? ' – ' + formatDate(it.end_date) : ''}</div>
+        `;
+        el.addEventListener('click', () => {
+          m.openPopup();
+          // center on it without changing zoom level
+          map.panTo(m.getLatLng(), { animate: true });
+        });
+        cards.push(el);
       }
-      if (bounds) map.fitBounds(bounds.pad(0.2));
-    }
+    });
+
+    // optional: sort by start date to make it tidy
+    cards.sort((a,b) => {
+      const ad = new Date(a.querySelector('.conf-meta:nth-child(3)')?.textContent?.split('–')[0] || 0).getTime();
+      const bd = new Date(b.querySelector('.conf-meta:nth-child(3)')?.textContent?.split('–')[0] || 0).getTime();
+      return ad - bd;
+    });
+
+    cards.forEach(c => panel.appendChild(c));
   }
 
   function wire(semId, semMap) {
     for (const [sub, items] of semMap.entries()) {
       const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
       const cb = document.getElementById(id);
-      cb.addEventListener('change', () => { toggleSet(cb.checked, semId, sub, items); });
+      cb.addEventListener('change', () => {
+        toggleSet(cb.checked, semId, sub, items);
+      });
     }
   }
   wire('sem-I', bySemester.I);
   wire('sem-II', bySemester.II);
+
+  // Update bottom cards when the map moves/zooms so it's truly "on-screen"
+  map.on('moveend', updateBottomPanel);
   </script>
 </body>
 </html>
