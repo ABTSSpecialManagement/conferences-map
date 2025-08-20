@@ -93,6 +93,18 @@
       flex-basis: 100%;
       height: 0;
     }
+    #clear-btn {
+      margin-top: 10px;
+      padding: 6px 10px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+    }
+    #clear-btn:hover {
+      background: #f0f0f0;
+    }
   </style>
 </head>
 <body>
@@ -102,6 +114,7 @@
       <div id="sem-I" class="subs-list"></div>
       <h2>Semester II (Jul–Dec)</h2>
       <div id="sem-II" class="subs-list"></div>
+      <button id="clear-btn">Clear All</button>
       <hr>
       <div class="muted">Pins use baked-in coordinates per city from your sheet. Unknown cities fall back to live geocoding.</div>
     </div>
@@ -171,28 +184,25 @@
     bySemester[sem].get(sub).push(it);
   }
 
-  // ======= Distinct color per subspecialty (unbounded) =======
-  // Build stable list of subspecialties across both semesters
+  // ======= Distinct color per subspecialty (updated palette) =======
   const SUBS_ALL = Array.from(new Set([
     ...Array.from(bySemester.I.keys()), ...Array.from(bySemester.II.keys())
   ])).sort();
 
-  // Golden-angle color generator (good distinctness)
-  function hslToHex(h, s, l) {
-    s /= 100; l /= 100;
-    const k = n => (n + h/30) % 12;
-    const a = s * Math.min(l, 1 - l);
-    const f = n => l - a * Math.max(-1, Math.min(k(n)-3, Math.min(9 - k(n), 1)));
-    return '#' + [f(0), f(8), f(4)].map(x => {
-      const v = Math.round(255 * x).toString(16).padStart(2, '0');
-      return v;
-    }).join('');
-  }
+  // High-contrast 24-color palette (distinct across hue & lightness)
+  const PALETTE = [
+    "#e6194b","#3cb44b","#ffe119","#0082c8",
+    "#f58231","#911eb4","#46f0f0","#f032e6",
+    "#d2f53c","#fabebe","#008080","#e6beff",
+    "#aa6e28","#fffac8","#800000","#aaffc3",
+    "#808000","#ffd8b1","#000080","#808080",
+    "#6a3d9a","#b15928","#2b908f","#ff1493"
+  ];
+
   const COLORS = new Map();     // subspecialty -> hex
   const ICONS  = new Map();     // subspecialty -> L.DivIcon
   for (let i=0; i<SUBS_ALL.length; i++) {
-    const hue = (i * 137.508) % 360;           // golden angle
-    const color = hslToHex(hue, 72, 47);       // s=72%, l=47% (nice, vivid)
+    const color = PALETTE[i % PALETTE.length];
     COLORS.set(SUBS_ALL[i], color);
   }
   function getIconFor(sub) {
@@ -379,6 +389,25 @@
 
   // Update bottom cards when the map moves/zooms so it's truly "on-screen"
   map.on('moveend', updateBottomPanel);
+
+  // ======= Clear All: uncheck boxes and clear all pins =======
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    // Uncheck all checkboxes and toggle off each group if needed
+    document.querySelectorAll('#sidebar input[type="checkbox"]').forEach(cb => {
+      if (cb.checked) {
+        cb.checked = false;
+        const sub = cb.dataset.sub;
+        const semId = cb.dataset.sem;
+        const items = (semId === 'sem-I' ? bySemester.I : bySemester.II).get(sub) || [];
+        toggleSet(false, semId, sub, items);
+      }
+    });
+    // Extra safety: remove any remaining visible markers & reset order
+    visibleMarkers.forEach(m => { if (map.hasLayer(m)) map.removeLayer(m); });
+    visibleMarkers.clear();
+    openOrder.length = 0;
+    updateBottomPanel();
+  });
   </script>
 </body>
 </html>
