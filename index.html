@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html>
 <head>
   <meta charset="utf-8">
@@ -159,6 +159,8 @@
     }
     return { lat:null, lon:null };
   }
+
+  // ======= Popup content (CHANGED ONLY THIS) =======
   function popupHTML(it) {
     const name = safeText(it.name) || safeText(it.full_name) || 'Conference';
     const full = safeText(it.full_name) || name;
@@ -166,13 +168,24 @@
     const desc = safeText(it.additional_description) || '';
     const sd = formatDate(it.start_date);
     const ed = formatDate(it.end_date);
-    return `<div class="popup-content">
-      <b>${name}</b><br><br>
-      (${safeText(it.name) || name}) ${full} in ${loc},<br><br>
-      ${desc ? `${desc}<br><br>` : ''}
-      ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
-      <a href="https://abtscs.com/" target="_blank" rel="noopener">https://abtscs.com/</a>
-    </div>`;
+
+    // Desired format:
+    // ONS
+    // Oncology Nursing Society
+    // Washington, DC,
+    // Oncology Nursing
+    // from 4/24/2026 to 4/28/2026.
+    // https://abtscs.com/
+    return `
+      <div class="popup-content">
+        <b>${name}</b><br><br>
+        ${full}<br><br>
+        ${loc},<br><br>
+        ${desc ? `${desc}<br><br>` : ''}
+        ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
+        <a href="https://abtscs.com/" target="_blank" rel="noopener">https://abtscs.com/</a>
+      </div>
+    `;
   }
 
   // ======= Group by semester + subspecialty =======
