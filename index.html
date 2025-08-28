@@ -201,21 +201,22 @@
 
     // ======= Popup content (NO additional description, clickable link) =======
     function popupHTML(it) {
-      const full = safeText(it.full_name) || safeText(it.short_name) || 'Conference';
-      const loc  = safeText(it.location_raw) || 'TBA';
-      const sd   = formatDate(it.start_date);
-      const ed   = formatDate(it.end_date);
-      const link = safeText(it.link);
+  const shortN = safeText(it.short_name) || 'Conference';
+  const full   = safeText(it.full_name);
+  const loc    = safeText(it.location_raw) || 'TBA';
+  const sd     = formatDate(it.start_date);
+  const ed     = formatDate(it.end_date);
+  const link   = safeText(it.link);
 
-      return `
-        <div class="popup-content">
-          <b>${full}</b><br><br>
-          ${loc},<br><br>
-          ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
-          ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : ''}
-        </div>
-      `;
-    }
+  return `
+    <div class="popup-content">
+      <b>${shortN}</b>${full ? ` – ${full}` : ''}<br><br>
+      ${loc}<br><br>
+      ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
+      ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : ''}
+    </div>
+  `;
+}
 
     // ======= Group by semester + subspecialty =======
     const bySemester = { I: new Map(), II: new Map() };
@@ -359,19 +360,19 @@
     }
 
     function cardHTML(it, color) {
-      const title = safeText(it.full_name) || 'Conference';
-      const loc   = safeText(it.location_raw) || 'TBA';
-      const sd    = formatDate(it.start_date);
-      const ed    = formatDate(it.end_date);
-      return `
-        <div class="conf-title">
-          <span class="card-pin" style="--pin-color:${color}"></span>
-          <span>${title}</span>
-        </div>
-        <div class="conf-meta">${loc}</div>
-        <div class="conf-meta">${sd}${ed ? ' – ' + ed : ''}</div>
-      `;
-    }
+  const title = safeText(it.short_name) || 'Conference';
+  const loc   = safeText(it.location_raw) || 'TBA';
+  const sd    = formatDate(it.start_date);
+  const ed    = formatDate(it.end_date);
+  return `
+    <div class="conf-title">
+      <span class="card-pin" style="--pin-color:${color}"></span>
+      <span>${title}</span>
+    </div>
+    <div class="conf-meta">${loc}</div>
+    <div class="conf-meta">${sd}${ed ? ' – ' + ed : ''}</div>
+  `;
+}
 
     function updateBottomPanel() {
       const panel = document.getElementById('bottom-panel');
