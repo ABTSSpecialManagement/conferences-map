@@ -1,52 +1,135 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>Conferences 2026</title>
-  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
-  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+  <meta charset="utf-8">
+  <title>Conference Map 2026</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    :root { --sidebar-w: 320px; --right-w: 380px; --font: "Century Gothic", CenturyGothic, AppleGothic, sans-serif; }
+    :root { --font: "Century Gothic", CenturyGothic, AppleGothic, sans-serif; }
+
     * { box-sizing: border-box; }
-    body { margin:0; font-family: var(--font); }
-    #map { position: absolute; top:0; bottom:0; left: var(--sidebar-w); right: var(--right-w); }
-    #menu {
-      position: absolute; top:0; left:0; bottom:0;
-      width: var(--sidebar-w); overflow:auto; background:#fff;
-      padding:16px 14px; border-right:1px solid #e6e6e6;
-    }
-    #cards-panel {
-      position: absolute; top:0; right:0; bottom:0;
-      width: var(--right-w); overflow:auto; background:#fafafa;
-      border-left:1px solid #e6e6e6; padding:16px 14px;
-    }
-    .section-title { font-size:14px; font-weight:700; margin:12px 0 6px; }
-    .semester { border:1px solid #eee; border-radius:12px; padding:10px 12px; margin-bottom:12px; }
-    .checkbox-row { display:flex; align-items:center; gap:8px; font-size:14px; padding:4px 2px; border-radius:8px; }
-    .checkbox-row:hover { background:#f7f7f7; }
-    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.15); }
+    body { margin:0; padding:0; display:flex; flex-direction:column; height:100vh; font-family: var(--font); }
 
-    .card-group { margin-bottom:16px; }
-    .card-group-title { font-size:13px; font-weight:600; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
-    .card {
-      background:white; border:1px solid #ddd; border-radius:10px;
-      padding:10px 12px; margin-bottom:8px; box-shadow:0 1px 2px rgba(0,0,0,0.05);
-      cursor:pointer; transition: background 0.2s, border-color 0.2s;
+    /* Topbar (shown on mobile) */
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: none; align-items: center; justify-content: space-between;
+      padding: 0 10px; background:#fff; border-bottom:1px solid #e6e6e6; z-index: 1000;
     }
-    .card:hover { background:#f2f7ff; border-color:#aac8ff; }
-    .card.selected { background:#e6f0ff; border-color:#4a90e2; box-shadow:0 0 0 2px rgba(74,144,226,0.4); }
-    .card-title { font-size:14px; font-weight:600; }
-    .card-sub { font-size:13px; color:#666; }
-    .card-dates { font-size:12px; color:#444; margin-top:4px; }
-    .card-link { display:inline-block; font-size:12px; margin-top:6px; text-decoration:underline; }
+    #topbar .tb-title { font-weight:700; letter-spacing:.2px; }
+    #topbar .tb-btn {
+      appearance: none; border:1px solid #d6d6d6; background:#fff; padding:6px 10px; border-radius:8px;
+      font-size:14px; line-height:1; cursor:pointer; min-width:84px; text-align:center;
+      transition: transform .05s ease;
+    }
+    #topbar .tb-btn:active { transform: translateY(1px); }
 
-    #view-toggle {
-      display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:8px 10px;
-      background:#fff; border:1px solid #e6e6e6; border-radius:10px;
+    /* Scrim behind drawers (mobile) */
+    #scrim { display:none; position: fixed; inset: 52px 0 0 0; background: rgba(0,0,0,.28); z-index: 999; }
+    #scrim.show { display:block; }
+
+    /* Desktop layout */
+    #main { flex:1; display:flex; min-height:0; }
+    #sidebar {
+      width: 300px; padding: 12px; background: #f8f8f8; border-right: 1px solid #ddd;
+      overflow-y: auto;
     }
-    #view-toggle label { font-size:13px; display:flex; align-items:center; gap:6px; }
-    #view-toggle input { accent-color:#4a90e2; }
+    #map { flex:1; height: 100%; background: #D5E8EB; }
+    #legend {
+      width: 260px; padding: 12px; background: #fafafa; border-left: 1px solid #ddd;
+      overflow-y: auto;
+    }
+
+    h2 { margin: 8px 0; font-size: 16px; }
+    .subs-list label { display:block; margin: 3px 0; font-size: 13px; cursor: pointer; }
+    .muted { color:#666; font-size:12px; }
+
+    .legend-title { margin: 8px 0; font-size: 14px; font-weight: 600; }
+    .legend-item { display:flex; align-items:center; gap:8px; font-size:13px; margin: 5px 0; }
+
+    .popup-content { line-height: 1.3; font-size: 13px; }
+    .popup-content a { word-break: break-all; }
+    .leaflet-popup-content,
+    .leaflet-popup-content h1,
+    .leaflet-popup-content h2,
+    .leaflet-popup-content h3,
+    .leaflet-popup-content p { font-family: var(--font) !important; }
+
+    /* Popup styling */
+    .leaflet-popup-content-wrapper { border-radius: 10px; }
+    @media (max-width: 900px) {
+      .leaflet-popup-content-wrapper {
+        max-height: 60vh;                 /* scroll inside popup if tall */
+        overflow: auto;
+        max-width: calc(100vw - 48px);    /* never wider than viewport minus side padding */
+      }
+    }
+
+    /* Custom pin */
+    .custom-pin { background: transparent; border: none; }
+    .pin-shape {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--pin-color, #2b7); border: 2px solid #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.35);
+      position: relative;
+    }
+    .pin-shape::after {
+      content: "";
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      bottom: -8px; width: 0; height: 0;
+      border: 8px solid transparent;
+      border-top-color: var(--pin-color, #2b7);
+      filter: drop-shadow(0 1px 0 rgba(0,0,0,0.2));
+    }
+
+    /* Legend pin */
+    .legend-pin {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--pin-color, #2b7); border: 2px solid #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+      display:inline-block;
+    }
+
+    /* Bottom panel (cards) */
+    #bottom-panel {
+      border-top: 1px solid #ddd;
+      background: #fff;
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .conf-card {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #f9f9f9;
+      cursor: pointer;
+      flex: 1 1 260px;
+      font-size: 13px;
+      transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .conf-card:hover { background: #f1f1f1; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .conf-card.selected {
+      background: #e9f1ff;
+      border-color: #4a90e2;
+      box-shadow: 0 0 0 2px rgba(74,144,226,0.35);
+    }
+    .conf-title { font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:8px; }
+    .conf-meta { color:#444; }
+    .card-pin {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--pin-color, #2b7); border: 2px solid #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+      display:inline-block;
+      flex: 0 0 auto;
+    }
+    .group-divider { flex-basis: 100%; height: 0; }
 
     #clear-btn {
       font-family: var(--font) !important;
@@ -55,57 +138,37 @@
     }
     #clear-btn:hover { background: #1E88BD; border: 1px solid #1E88BD; }
 
-    .mapboxgl-popup, .mapboxgl-popup * { font-family: var(--font); }
+    /* Branding */
+    #branding { text-align: center; margin-bottom: 20px; }
+    #branding img { width: 250px; display: block; margin: 0 auto 8px; }
+    #branding h1 { font-size: 18px; margin: 0; font-weight: 700; }
 
-    /* Brand header in the left sidebar */
-    #brand {
-      display:flex; flex-direction:column; align-items:center; gap:8px;
-      padding:12px 8px 14px; border-bottom:1px solid #eee; margin-bottom:10px;
-    }
-    #brand .brand-logo { width:180px; height:80px; object-fit:contain; }
-    #brand .brand-name { font-family: var(--font); font-size:18px; font-weight:700; letter-spacing:.2px; }
+    /* Map style selector (in Legend) */
+    #map-style { margin-top: 20px; font-size: 13px; }
+    #map-style label { display: block; margin-bottom: 4px; }
 
-    /* -------- Mobile top bar + drawers -------- */
-    #topbar {
-      position: fixed; top: 0; left: 0; right: 0; height: 52px;
-      display: none; align-items: center; justify-content: space-between;
-      padding: 0 10px; background:#fff; border-bottom:1px solid #e6e6e6; z-index: 10;
-      font-family: var(--font);
-    }
-    #topbar .tb-title { font-weight:700; letter-spacing:.2px; }
-    #topbar .tb-btn {
-      appearance: none; border:1px solid #d6d6d6; background:#fff; padding:6px 10px; border-radius:8px;
-      font-size:14px; line-height:1; cursor:pointer;
-    }
-    #topbar .tb-btn:active { transform: translateY(1px); }
-
-    /* Scrim behind drawers */
-    #scrim { display:none; position: fixed; inset: 52px 0 0 0; background: rgba(0,0,0,.28); z-index: 10; }
-    #scrim.show { display:block; }
-
-    /* Mobile layout */
+    /* ---------- Mobile drawers ---------- */
     @media (max-width: 900px) {
       #topbar { display:flex; padding-top: env(safe-area-inset-top); height: calc(52px + env(safe-area-inset-top)); }
-      #map { top: calc(52px + env(safe-area-inset-top)); left: 0; right: 0; } /* map below the topbar */
+      #main { margin-top: calc(52px + env(safe-area-inset-top)); }
 
-      /* Turn side panels into drawers */
-      #menu, #cards-panel {
+      #sidebar, #legend {
         position: fixed; top: calc(52px + env(safe-area-inset-top)); bottom: 0;
-        width: 88vw; max-width: 420px; background: #fff; z-index: 11;
+        width: 88vw; max-width: 420px; background: #fff; z-index: 1001;
         transition: transform .25s ease; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+        overflow-y: auto;
       }
-      #menu       { left: 0;  transform: translateX(-100%); }
-      #menu.open  { transform: translateX(0); }
-      #cards-panel       { right: 0; transform: translateX(100%); }
-      #cards-panel.open  { transform: translateX(0); }
+      #sidebar { left: 0;  transform: translateX(-100%); border-right: 1px solid #ddd; }
+      #legend  { right: 0; transform: translateX(100%);  border-left: 1px solid #ddd; }
 
-      /* Tighter paddings on small screens */
-      #menu, #cards-panel { padding: 14px 12px; }
-      .section-title { margin-top: 8px; }
+      #sidebar.open { transform: translateX(0); }
+      #legend.open  { transform: translateX(0); }
 
-      /* Larger tap targets */
-      .checkbox-row { padding:6px 4px; }
-      .card { padding:12px; }
+      #map { flex: 1 1 auto; }
+
+      #sidebar, #legend { padding: 12px; }
+      .subs-list label { margin: 6px 0; }
+      #branding img { width: 200px; }
     }
   </style>
 </head>
@@ -113,459 +176,430 @@
 
   <!-- Mobile top bar + scrim -->
   <div id="topbar">
-    <button id="btn-filters" class="tb-btn" aria-controls="menu" aria-expanded="false">Filters</button>
+    <button id="btn-filters" class="tb-btn" aria-controls="sidebar" aria-expanded="false">Filters</button>
     <div class="tb-title">Conferences Map</div>
-    <button id="btn-cards" class="tb-btn" aria-controls="cards-panel" aria-expanded="false">Selected</button>
+    <button id="btn-legend" class="tb-btn" aria-controls="legend" aria-expanded="false">Legend</button>
   </div>
   <div id="scrim" aria-hidden="true"></div>
 
-  <div id="menu">
-    <div id="brand">
-      <img class="brand-logo" src="ABTSx4.png" alt="Logo">
-      <div class="brand-name">Conferences Map</div>
-    </div>
-    <div class="section-title">Filters</div>
-    <div id="filters"></div>
-    <button id="clear-btn">Clear All</button>
-  </div>
+  <div id="main">
+    <!-- Left: Filters -->
+    <div id="sidebar">
+      <div id="branding">
+        <img src="ABTSx4.png" alt="Logo">
+        <h1>Conferences Map</h1>
+      </div>
 
-  <div id="map"></div>
-
-  <div id="cards-panel">
-    <div class="section-title">Map view</div>
-    <div id="view-toggle" role="group" aria-label="Map view">
-      <label><input type="radio" name="mapview" value="2d" checked> 2D (streets)</label>
-      <label><input type="radio" name="mapview" value="3d"> 3D globe</label>
+      <h2>Semester I (Jan–Jun)</h2>
+      <div id="sem-I" class="subs-list"></div>
+      <h2>Semester II (Jul–Dec)</h2>
+      <div id="sem-II" class="subs-list"></div>
+      <button id="clear-btn">Clear All</button>
+      <hr>
+      <div class="muted">Tip: tap anywhere on the map to close panels.</div>
     </div>
 
-    <div class="section-title">Selected Conferences</div>
-    <div id="cards"></div>
+    <!-- Map -->
+    <div id="map"></div>
+
+    <!-- Right: Legend / Styles -->
+    <div id="legend">
+      <div class="legend-title">Legend (Subspecialty → Color)</div>
+      <div id="legend-items"></div>
+
+      <div id="map-style">
+        <div class="legend-title">Map Style</div>
+        <label><input type="radio" name="basemap" value="voyager" checked> Carto Voyager</label>
+        <label><input type="radio" name="basemap" value="default"> Default OSM</label>
+        <label><input type="radio" name="basemap" value="esri"> ESRI World Street</label>
+      </div>
+    </div>
   </div>
 
+  <div id="bottom-panel"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // Token
-    mapboxgl.accessToken = 'pk.eyJ1IjoibWFqYS1wYXZsaWNpYyIsImEiOiJjbWVpYnloeWowMG5xMmtzOGdnN2tjempnIn0.2LRD1_4AAyAVQWZ9kTZa2A';
+  (async () => {
+    // ======= Load your prepared data =======
+    const DATA_URL = "conferences_2026.updated.json";
+    const DATA = await fetch(DATA_URL).then(r => r.json());
 
-    let activePopup = null;
-    let activeCard = null;
+    // ======= Map setup =======
+    const map = L.map('map', { worldCopyJump: true }).setView([20, 0], 2);
+    map.setMaxBounds([[-85, -180], [85, 180]]);
 
-    // City dictionary
-    const cityCoords = {
-      "San Francisco": [-122.4194, 37.7749],
-      "Edinburgh": [-3.1883, 55.9533],
-      "Dublin": [-6.2603, 53.3498],
-      "Salt Lake City": [-111.8910, 40.7608],
-      "San Diego": [-117.1611, 32.7157],
-      "Hong Kong": [114.1694, 22.3193],
-      "Stockholm": [18.0686, 59.3293],
-      "Los Angeles": [-118.2437, 34.0522],
-      "Copenhagen": [12.5683, 55.6761],
-      "Lisabon": [-9.1393, 38.7223],
-      "Lisbon": [-9.1393, 38.7223],
-      "Miami": [-80.1918, 25.7617],
-      "Phoenix": [-112.0740, 33.4484],
-      "Orlando": [-81.3792, 28.5383],
-      "Budapest": [19.0402, 47.4979],
-      "London": [-0.1276, 51.5074],
-      "Seville": [-5.9845, 37.3891],
-      "Krakow": [19.9445, 50.0647],
-      "San Antonio": [-98.4936, 29.4241],
-      "New Orleans": [-90.0715, 29.9511],
-      "Florence": [11.2558, 43.7696],
-      "Denver": [-104.9903, 39.7392],
-      "Prague": [14.4378, 50.0755],
-      "Warsaw": [21.0122, 52.2297],
-      "San Juan": [-66.1057, 18.4655],
-      "São Paulo": [-46.6333, -23.5505],
-      "Sao Paulo": [-46.6333, -23.5505],
-      "Paris": [2.3522, 48.8566],
-      "Munich": [11.5820, 48.1351],
-      "Kuala Lumpur": [101.6869, 3.1390],
-      "Washington, DC": [-77.0369, 38.9072],
-      "Washington": [-77.0369, 38.9072],
-      "Toronto": [-79.3832, 43.6532],
-      "Berlin": [13.4050, 52.5200],
-      "Istanbul, Turkey": [28.9784, 41.0082],
-      "Istanbul": [28.9784, 41.0082],
-      "Barcelona": [2.1734, 41.3851],
-      "Charlotte": [-80.8431, 35.2271],
-      "Chicago": [-87.6298, 41.8781],
-      "Glasgow": [-4.2518, 55.8642],
-      "Athens": [23.7275, 37.9838],
-      "Philadelphia": [-75.1652, 39.9526],
-      "Amsterdam": [4.9041, 52.3676],
-      "Lugano": [8.9511, 46.0037],
-      "Lille": [3.0573, 50.6292],
-      "Geneva": [6.1432, 46.2044],
-      "Queensland": [153.0251, -27.4698],
-      "Marseilles": [5.3698, 43.2965],
-      "Marseille": [5.3698, 43.2965],
-      "Seoul": [126.9780, 37.5665],
-      "Hiroshima": [132.4553, 34.3853],
-      "Vienna": [16.3738, 48.2082],
-      "Thessaloniki": [22.9444, 40.6401],
-      "Madrid": [-3.7038, 40.4168],
-      "Las Vegas": [-115.1398, 36.1699],
-      "Atlanta": [-84.3880, 33.7490],
-      "Boston": [-71.0589, 42.3601],
-      "San Diego County": [-117.1611, 32.7157]
+    const baseLayers = {
+      default: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }),
+      esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ'
+      }),
+      voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 20
+      })
     };
+    baseLayers.voyager.addTo(map);
+    document.querySelectorAll('input[name="basemap"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        const val = e.target.value;
+        Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+        baseLayers[val].addTo(map);
+      });
+    });
 
-    const normalizeCity = (s) => {
-      if (!s) return s;
-      return s
-        .replace(/\bChopenhagen\b/i, 'Copenhagen')
-        .replace(/\bLisabon\b/i, 'Lisbon')
-        .replace(/\bMarseilles\b/i, 'Marseille')
-        .replace(/\bWashington\b(?!,\s*DC\b)/i, 'Washington, DC')
-        .trim();
-    };
+    // ======= Mobile drawers (filters & legend) with ✕ toggles =======
+    const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
 
-    const palette = [
+    const btnFilters = document.getElementById('btn-filters');
+    const btnLegend  = document.getElementById('btn-legend');
+    const scrim      = document.getElementById('scrim');
+    const sidebarEl  = document.getElementById('sidebar');
+    const legendEl   = document.getElementById('legend');
+    let openDrawer = null; // 'filters' | 'legend' | null
+
+    function setTopbarUI(){
+      btnFilters.textContent = (openDrawer === 'filters') ? '✕' : 'Filters';
+      btnLegend.textContent  = (openDrawer === 'legend')  ? '✕' : 'Legend';
+      btnFilters.setAttribute('aria-expanded', openDrawer === 'filters');
+      btnLegend.setAttribute('aria-expanded',  openDrawer === 'legend');
+    }
+    function openDrawerFn(which){
+      if (!isMobile()) return;
+      if (openDrawer === which) { closeDrawers(); return; }
+      if (openDrawer === 'filters') sidebarEl.classList.remove('open');
+      if (openDrawer === 'legend')  legendEl.classList.remove('open');
+
+      if (which === 'filters') sidebarEl.classList.add('open');
+      if (which === 'legend')  legendEl.classList.add('open');
+
+      openDrawer = which;
+      scrim.classList.add('show');
+      document.body.style.overflow='hidden';
+      setTopbarUI();
+    }
+    function closeDrawers(){
+      sidebarEl.classList.remove('open');
+      legendEl.classList.remove('open');
+      openDrawer = null;
+      scrim.classList.remove('show');
+      document.body.style.overflow='';
+      setTopbarUI();
+    }
+    btnFilters.addEventListener('click', ()=> openDrawerFn('filters'));
+    btnLegend .addEventListener('click', ()=> openDrawerFn('legend'));
+    scrim.addEventListener('click', closeDrawers);
+    window.addEventListener('resize', ()=> { if (!isMobile()) closeDrawers(); });
+    map.on('click', () => { if (isMobile() && openDrawer) closeDrawers(); });
+    setTopbarUI();
+
+    // ======= Helpers =======
+    function formatDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+    }
+    function safeText(v, fallback='') {
+      if (v === null || v === undefined) return fallback;
+      const s = String(v);
+      return (s.toLowerCase() === 'nan') ? fallback : s;
+    }
+    async function geocode(location) {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1&accept-language=en`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const arr = await res.json();
+      if (Array.isArray(arr) && arr.length) {
+        return { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon) };
+      }
+      return { lat:null, lon:null };
+    }
+
+    // Popup options with edge padding (prevents clipping on top & sides)
+    function popupOpts() {
+      const mobile = isMobile();
+      const H_PAD = mobile ? 24 : 12;             // left/right padding
+      const TOPBAR_PADDING = 90;                  // topbar + a bit of cushion
+      const V_TOP  = mobile ? (TOPBAR_PADDING + 12) : 12;
+      const V_BR   = 12;
+      const maxW = mobile
+        ? Math.max(240, Math.min(300, window.innerWidth - (H_PAD * 2) - 12))
+        : 320;
+
+      return {
+        autoPan: true,
+        keepInView: true,
+        maxWidth: maxW,
+        autoPanPaddingTopLeft: [H_PAD, V_TOP],
+        autoPanPaddingBottomRight: [H_PAD, V_BR]
+      };
+    }
+
+    // ======= Popup content =======
+    function popupHTML(it) {
+      const shortN = safeText(it.short_name) || 'Conference';
+      const full   = safeText(it.full_name);
+      const loc    = safeText(it.location_raw) || 'TBA';
+      const sd     = formatDate(it.start_date);
+      const ed     = formatDate(it.end_date);
+      const link   = safeText(it.link);
+
+      return `
+        <div class="popup-content">
+          <b>${shortN}</b>${full ? ` – ${full}` : ''}<br><br>
+          ${loc}<br><br>
+          ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
+          ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : ''}
+        </div>
+      `;
+    }
+
+    // ======= Group by semester + subspecialty =======
+    const bySemester = { I: new Map(), II: new Map() };
+    for (const it of DATA) {
+      const sem = it.semester === 'II' ? 'II' : 'I';
+      const sub = safeText(it.subspecialty) || 'Unspecified';
+      if (!bySemester[sem].has(sub)) bySemester[sem].set(sub, []);
+      bySemester[sem].get(sub).push(it);
+    }
+
+    // ======= Distinct colors per subspecialty =======
+    const SUBS_ALL = Array.from(new Set([
+      ...Array.from(bySemester.I.keys()), ...Array.from(bySemester.II.keys())
+    ])).sort();
+
+    const BASE_PALETTE = [
       "#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#46f0f0","#f032e6",
       "#bcf60c","#fabebe","#008080","#e6beff","#9a6324","#fffac8","#800000","#aaffc3",
       "#808000","#ffd8b1","#000075","#808080","#ffe4e1","#40e0d0","#6a3d9a","#b15928",
       "#2b908f","#ff7f0e","#1f77b4","#2ca02c","#d62728","#9467bd"
     ];
+    function hslToHex(h, s, l) {
+      s/=100; l/=100;
+      const c = (1 - Math.abs(2*l - 1)) * s;
+      const x = c * (1 - Math.abs((h/60) % 2 - 1));
+      const m = l - c/2;
+      let [r,g,b] = (h<60)?[c,x,0]: (h<120)?[x,c,0]: (h<180)?[0,c,x]:
+                    (h<240)?[0,x,c]: (h<300)?[x,0,c]: [c,0,x];
+      const toHex = v => Math.round((v+m)*255).toString(16).padStart(2,'0');
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+    const COLORS = new Map();
+    const ICONS  = new Map();
+    for (let i=0; i<SUBS_ALL.length; i++) {
+      const color = BASE_PALETTE[i] || hslToHex((i* 360/SUBS_ALL.length) % 360, 70, 48);
+      COLORS.set(SUBS_ALL[i], color);
+    }
+    function getIconFor(sub) {
+      if (ICONS.has(sub)) return ICONS.get(sub);
+      const color = COLORS.get(sub) || '#2b7';
+      const icon = L.divIcon({
+        className: 'custom-pin',
+        html: `<div class="pin-shape" style="--pin-color:${color}"></div>`,
+        iconSize: [24, 34],
+        iconAnchor: [12, 34],
+        popupAnchor: [1, -28]
+      });
+      ICONS.set(sub, icon);
+      return icon;
+    }
 
-    // Map init (single colorful style)
-    const map = new mapboxgl.Map({
-      container:'map',
-      style:'mapbox://styles/mapbox/streets-v12',
-      center:[10,35],
-      zoom:2.2,
-      projection:'mercator'
-    });
+    // ======= Markers, toggling, and bottom panel =======
+    const markerGroups = new Map(); // key: semId__sub -> markers[]
+    const visibleMarkers = new Set();
+    const openOrder = [];
 
-    let features = [];
-    let distinctSubs = [];
-    let subColor = {};
-    const filtersRoot = document.getElementById('filters');
-    const cardsRoot   = document.getElementById('cards');
-    let initialized = false;
+    // selected state tracking
+    let currentSelectedUid = null;
 
-    // Load data from JSON
-    fetch('conferences_2026.json')
-      .then(r => r.json())
-      .then(json => {
-        features = jsonToFeatures(json);
-        distinctSubs = [...new Set(features.map(f => f.properties.subcategory))].sort();
-        subColor = {}; distinctSubs.forEach((s,i)=> subColor[s] = palette[i % palette.length]);
+    function buildUid(it) {
+      return [
+        safeText(it.short_name), safeText(it.start_date),
+        safeText(it.location_raw), safeText(it.link)
+      ].join('|');
+    }
 
-        if (map.loaded()) initLayersAndUI();
-        else map.once('load', initLayersAndUI);
-      })
-      .catch(err => {
-        console.error('Failed to load JSON', err);
-        alert('Could not load conferences_2026.json. Serve via http and check the path.');
+    async function ensureMarker(it, icon, color, key, orderIdx, sub) {
+      let lat = (typeof it.lat === 'number') ? it.lat : null;
+      let lon = (typeof it.lon === 'number') ? it.lon : null;
+
+      if ((lat == null || lon == null) && (it.location_raw)) {
+        const res = await geocode(it.location_raw);
+        lat = res.lat; lon = res.lon;
+      }
+      if (lat == null || lon == null) return null;
+
+      const m = L.marker([lat, lon], { icon }).bindPopup(popupHTML(it), popupOpts());
+      m._confData = it;
+      m._groupKey = key;
+      m._order = orderIdx;
+      m._sub = sub;
+      m._color = color;
+      m._uid = buildUid(it);
+
+      // When marker is clicked → highlight card & scroll to it
+      m.on('click', () => {
+        currentSelectedUid = m._uid;
+        map.panTo(m.getLatLng(), { animate: true });
+        updateBottomPanel();
+        selectCardByUid(currentSelectedUid, { scroll: true });
+        setTimeout(() => selectCardByUid(currentSelectedUid, { scroll: true }), 300);
       });
 
-    // --- Helpers: date + semester ---
-    function normalizeDate(s){
-      if (!s) return null;
-      const iso = /^\d{4}-\d{2}-\d{2}$/;
-      const us  = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
-      try{
-        if (iso.test(s)) return s;
-        if (us.test(s)) {
-          const [m,d,y] = s.split('/').map(Number);
-          const mm = String(m).padStart(2,'0'), dd = String(d).padStart(2,'0');
-          return `${y}-${mm}-${dd}`;
+      return m;
+    }
+
+    async function toggleSet(checked, semKey, sub, items) {
+      const key = `${semKey}__${sub}`;
+      if (!markerGroups.has(key)) markerGroups.set(key, []);
+      const arr = markerGroups.get(key);
+
+      if (!checked) {
+        for (const m of arr) {
+          if (map.hasLayer(m)) map.removeLayer(m);
+          visibleMarkers.delete(m);
         }
-      }catch(e){}
-      return s;
-    }
-    function monthFromDateStr(s){
-      if (!s) return null;
-      const d = new Date(s);
-      if (isNaN(d)) return null;
-      return d.getUTCMonth()+1; // 1..12
-    }
-    function computeSemester(start, end){
-      const m = monthFromDateStr(start) ?? monthFromDateStr(end);
-      if (!m) return 'Unknown semester';
-      return (m >= 1 && m <= 6) ? 'I semester' : 'II semester';
-    }
+        const idx = openOrder.indexOf(key);
+        if (idx >= 0) openOrder.splice(idx, 1);
+        updateBottomPanel();
+        return;
+      }
 
-    // Convert JSON rows to GeoJSON features (semester computed from dates)
-    function jsonToFeatures(rows){
-      const feats = [];
-      for (const r of rows){
-        const sub  = r.subspecialty || r.sub || 'Other';
-        const name = r.short_name || r.name || '(TBA)';
-        const full = r.full_name || '';
-        const cityRaw = normalizeCity(r.location_raw || r.city || '');
-        const start = normalizeDate(r.start_date || r.start);
-        const end   = normalizeDate(r.end_date   || r.end);
-        const link  = r.link || '';
+      if (!openOrder.includes(key)) openOrder.push(key);
 
-        const semesterLabel = computeSemester(start, end);
-
-        let coords = null;
-        if (Number.isFinite(r.lon) && Number.isFinite(r.lat)) {
-          coords = [r.lon, r.lat];
-        } else if (cityRaw && cityCoords[cityRaw]) {
-          coords = cityCoords[cityRaw];
+      if (arr.length === 0) {
+        const icon = getIconFor(sub);
+        const color = COLORS.get(sub);
+        let i = 0;
+        for (const it of items) {
+          const m = await ensureMarker(it, icon, color, key, i++, sub);
+          if (m) arr.push(m);
         }
-        if (!coords) continue;
+      }
 
-        feats.push({
-          type:'Feature',
-          properties:{
-            semester: semesterLabel,
-            subcategory: sub,
-            name, full_name: full, location: cityRaw,
-            start: start || 'TBA',
-            end: end || 'TBA',
-            link
-          },
-          geometry:{ type:'Point', coordinates: coords }
+      for (const m of arr) { m.addTo(map); visibleMarkers.add(m); }
+      updateBottomPanel();
+    }
+
+    function cardHTML(it, color) {
+      const title = safeText(it.short_name) || 'Conference';
+      const loc   = safeText(it.location_raw) || 'TBA';
+      const sd    = formatDate(it.start_date);
+      const ed    = formatDate(it.end_date);
+      return `
+        <div class="conf-title">
+          <span class="card-pin" style="--pin-color:${color}"></span>
+          <span>${title}</span>
+        </div>
+        <div class="conf-meta">${loc}</div>
+        <div class="conf-meta">${sd}${ed ? ' – ' + ed : ''}</div>
+      `;
+    }
+
+    function clearCardSelection() {
+      document.querySelectorAll('.conf-card.selected').forEach(el => el.classList.remove('selected'));
+    }
+
+    function selectCardByUid(uid, { scroll=false }={}) {
+      if (!uid) return;
+      const el = document.querySelector(`.conf-card[data-uid="${CSS.escape(uid)}"]`);
+      if (!el) return;
+      clearCardSelection();
+      el.classList.add('selected');
+      if (scroll) el.scrollIntoView({ behavior:'smooth', block:'center', inline:'nearest' });
+    }
+
+    // ---- SHOW ALL SELECTED PINS (no viewport filtering) ----
+    function updateBottomPanel() {
+      const panel = document.getElementById('bottom-panel');
+      panel.innerHTML = '';
+
+      // Group every marker that is currently added to the map (i.e., selected via filters)
+      const groupMap = new Map();
+      visibleMarkers.forEach(m => {
+        if (map.hasLayer(m)) {
+          if (!groupMap.has(m._groupKey)) groupMap.set(m._groupKey, []);
+          groupMap.get(m._groupKey).push(m);
+        }
+      });
+
+      for (const key of openOrder) {
+        const markers = groupMap.get(key);
+        if (!markers || markers.length === 0) continue;
+        markers.sort((a,b) => a._order - b._order);
+
+        for (const m of markers) {
+          const it = m._confData;
+          const color = m._color;
+          const el = document.createElement('div');
+          el.className = 'conf-card';
+          el.dataset.uid = m._uid;
+          el.innerHTML = cardHTML(it, color);
+          if (m._uid === currentSelectedUid) el.classList.add('selected');
+          el.addEventListener('click', () => {
+            currentSelectedUid = m._uid;
+            clearCardSelection();
+            el.classList.add('selected');
+            m.openPopup();                         // use bound options
+            map.panTo(m.getLatLng(), { animate: true }); // no zoom change
+            if (isMobile() && openDrawer) closeDrawers();
+          });
+          panel.appendChild(el);
+        }
+        const divider = document.createElement('div');
+        divider.className = 'group-divider';
+        panel.appendChild(divider);
+      }
+    }
+
+    // ======= Build checkboxes & legend =======
+    function buildCheckboxes(semId, semMap) {
+      const container = document.getElementById(semId);
+      const subs = Array.from(semMap.keys()).sort();
+      for (const sub of subs) {
+        const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = id;
+        cb.dataset.sub = sub;
+        cb.dataset.sem = semId;
+        label.appendChild(cb);
+        label.append(' ', sub);
+        container.appendChild(label);
+      }
+    }
+    function buildLegend() {
+      const legend = document.getElementById('legend-items');
+      for (const sub of SUBS_ALL) {
+        const color = COLORS.get(sub);
+        const row = document.createElement('div');
+        row.className = 'legend-item';
+        row.innerHTML = `<span class="legend-pin" style="--pin-color:${color}"></span><span>${sub}</span>`;
+        legend.appendChild(row);
+      }
+    }
+
+    buildCheckboxes('sem-I', bySemester.I);
+    buildCheckboxes('sem-II', bySemester.II);
+    buildLegend();
+
+    function wire(semId, semMap) {
+      for (const [sub, items] of semMap.entries()) {
+        const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
+        const cb = document.getElementById(id);
+        cb.addEventListener('change', () => {
+          toggleSet(cb.checked, semId, sub, items);
         });
       }
-      return feats;
     }
+    wire('sem-I', bySemester.I);
+    wire('sem-II', bySemester.II);
 
-    function initLayersAndUI(){
-      if (initialized) return;
-      initialized = true;
-
-      map.setPitch(0); map.setBearing(0);
-
-      const data = { type:'FeatureCollection', features };
-      map.addSource('conferences',{type:'geojson', data});
-
-      const matchColor = ['match',['get','subcategory']];
-      distinctSubs.forEach(s => { matchColor.push(s, subColor[s]); });
-      matchColor.push('#ccc');
-
-      map.addLayer({
-        id:'conferences-layer', type:'circle', source:'conferences',
-        paint:{ 'circle-radius':8, 'circle-color':matchColor, 'circle-stroke-width':1, 'circle-stroke-color':'#fff' }
-      });
-
-      buildSidebar();
-      applyFilters(); // nothing selected initially
-
-      map.on('click','conferences-layer',(e)=>{
-        const f = e.features[0], p = f.properties;
-        openPopupAndSelectCard(f, p);
-      });
-
-      document.getElementById('view-toggle').addEventListener('change', (e) => {
-        const input = e.target.closest('input'); if (!input) return;
-        if (input.value === '2d') {
-          map.setProjection('mercator');
-          map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
-          map.setFog(null);
-        } else if (input.value === '3d') {
-          map.setProjection('globe');
-          map.setFog({});
-        }
-      });
-
-      // ---- Mobile drawers (filters & selected) ----
-      const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
-      const topbarFiltersBtn = document.getElementById('btn-filters');
-      const topbarCardsBtn   = document.getElementById('btn-cards');
-      const scrim            = document.getElementById('scrim');
-      const menuEl           = document.getElementById('menu');
-      const cardsEl          = document.getElementById('cards-panel');
-
-      function openDrawer(which){
-        if (!isMobile()) return;
-        if (which === 'filters') {
-          menuEl.classList.add('open');
-          topbarFiltersBtn.setAttribute('aria-expanded','true');
-        } else {
-          cardsEl.classList.add('open');
-          topbarCardsBtn.setAttribute('aria-expanded','true');
-        }
-        scrim.classList.add('show');
-        document.body.style.overflow='hidden';
-      }
-      function closeDrawers(){
-        menuEl.classList.remove('open');
-        cardsEl.classList.remove('open');
-        topbarFiltersBtn.setAttribute('aria-expanded','false');
-        topbarCardsBtn.setAttribute('aria-expanded','false');
-        scrim.classList.remove('show');
-        document.body.style.overflow='';
-      }
-
-      topbarFiltersBtn.addEventListener('click', ()=> openDrawer('filters'));
-      topbarCardsBtn.addEventListener('click',   ()=> openDrawer('cards'));
-      scrim.addEventListener('click', closeDrawers);
-      window.addEventListener('resize', ()=> { if (!isMobile()) closeDrawers(); });
-
-      // make available to other functions:
-      window.__maybeCloseForMobile = function(){ if (isMobile()) closeDrawers(); };
-    }
-
-    function openPopupAndSelectCard(feature, props){
-      if (activePopup) activePopup.remove();
-      if (activeCard) activeCard.classList.remove('selected');
-
-      const card = [...document.querySelectorAll('.card')]
-        .find(c => c.dataset.name === props.name && c.dataset.semester === props.semester);
-      if (card) {
-        card.classList.add('selected');
-        activeCard = card;
-        card.scrollIntoView({ behavior:'smooth', block:'center' });
-      }
-
-      const viewMode = document.querySelector('input[name="mapview"]:checked').value;
-      if (viewMode === '3d') {
-        map.easeTo({
-          center: feature.geometry.coordinates,
-          zoom: map.getZoom(),          // keep current zoom (only rotate)
-          pitch: map.getPitch(),
-          bearing: map.getBearing(),
-          duration: 1500,
-          essential: true
-        });
-      } else {
-        map.easeTo({ center: feature.geometry.coordinates, duration: 800, pitch: 0, bearing: 0 });
-      }
-
-      const linkHTML = props.link ? `<div style="margin-top:6px"><a href="${props.link}" target="_blank" rel="noopener" style="color:#1f6feb;text-decoration:underline">Open website ↗</a></div>` : '';
-      const popup = new mapboxgl.Popup()
-        .setLngLat(feature.geometry.coordinates)
-        .setHTML(`
-          <div style="font-weight:700">${props.name}</div>
-          <div>${props.full_name || ''}</div>
-          <div><b>${props.location || ''}</b></div>
-          <div>${props.start} → ${props.end}</div>
-          ${linkHTML}
-        `)
-        .addTo(map);
-
-      activePopup = popup;
-      popup.on('close', ()=>{
-        if (activeCard) activeCard.classList.remove('selected');
-        activeCard = null; activePopup = null;
-      });
-
-      // close drawers on mobile so map is visible
-      if (window.__maybeCloseForMobile) window.__maybeCloseForMobile();
-    }
-
-    // Sidebar
-    function groupBySemesterAndSub(dataFeatures){
-      const bySem = {};
-      for (const f of dataFeatures){
-        const sem = f.properties.semester, sub = f.properties.subcategory;
-        (bySem[sem] ||= new Set()).add(sub);
-      }
-      const res = {};
-      for (const sem of Object.keys(bySem)) res[sem] = [...bySem[sem]].sort();
-      return res;
-    }
-    function colorDot(c){ return `<span class="dot" style="background:${c}"></span>`; }
-
-    function buildSidebar(){
-      const grouped = groupBySemesterAndSub(features);
-      const wrapper = document.createElement('div');
-
-      Object.keys(grouped).sort().forEach(sem=>{
-        const box=document.createElement('div'); box.className='semester';
-        const titleRow=document.createElement('label'); titleRow.className='checkbox-row section-title';
-        titleRow.innerHTML=`<input type="checkbox" data-semester-master="${sem}"> ${sem}`;
-        box.appendChild(titleRow);
-
-        grouped[sem].forEach(sub=>{
-          const row=document.createElement('label'); row.className='checkbox-row';
-          // keep semester on each input so filtering can match the pair
-          row.innerHTML=`<input type="checkbox" data-semester="${sem}" data-sub="${sub}"> ${colorDot(subColor[sub])} ${sub}`;
-          box.appendChild(row);
-        });
-        wrapper.appendChild(box);
-      });
-
-      filtersRoot.innerHTML=''; filtersRoot.appendChild(wrapper);
-
-      filtersRoot.addEventListener('change', e=>{
-        const t = e.target;
-        if (t.dataset.semesterMaster){
-          const sem=t.dataset.semesterMaster;
-          filtersRoot.querySelectorAll(`input[data-semester="${sem}"]`).forEach(cb=> cb.checked = t.checked);
-          t.indeterminate=false;
-        }
-        if (t.dataset.sub){
-          const sem=t.dataset.semester;
-          const subs=[...filtersRoot.querySelectorAll(`input[data-semester="${sem}"][data-sub]`)];
-          const master=filtersRoot.querySelector(`input[data-semester-master="${sem}"]`);
-          const all=subs.every(cb=>cb.checked), none=subs.every(cb=>!cb.checked);
-          master.checked=all; master.indeterminate=!all && !none;
-        }
-        applyFilters();
-      });
-
-      document.getElementById('clear-btn').addEventListener('click',()=>{
-        filtersRoot.querySelectorAll('input[type=checkbox]').forEach(cb=>{
-          cb.checked=false; cb.indeterminate=false;
-        });
-        applyFilters();
-      });
-    }
-
-    // Apply filters using (semester, sub) PAIRS
-    function applyFilters(){
-      const checkedPairs = [...filtersRoot.querySelectorAll('input[data-sub]:checked')]
-        .map(i => ({ sem: i.dataset.semester, sub: i.dataset.sub }));
-
-      if (checkedPairs.length===0){
-        if (map.getLayer('conferences-layer')){
-          map.setFilter('conferences-layer',['==',['get','subcategory'],'__none__']);
-        }
-        cardsRoot.innerHTML=''; return;
-      }
-
-      // Mapbox filter: OR of AND(semester==X, sub==Y)
-      const filter = ['any'];
-      checkedPairs.forEach(p => {
-        filter.push(['all',
-          ['==', ['get','semester'], p.sem],
-          ['==', ['get','subcategory'], p.sub]
-        ]);
-      });
-      map.setFilter('conferences-layer', filter);
-
-      // Build cards from the same pair set
-      const byGroup = {}; // key = `${sem} — ${sub}` to keep semesters distinct if both selected
-      features.forEach(f=>{
-        const sem = f.properties.semester, sub = f.properties.subcategory;
-        if (checkedPairs.some(p => p.sem===sem && p.sub===sub)) {
-          const key = `${sem} — ${sub}`;
-          (byGroup[key] ||= []).push(f);
-        }
-      });
-
-      const parse = (s)=> Date.parse(s) || Infinity;
-      Object.values(byGroup).forEach(arr => arr.sort((a,b)=> parse(a.properties.start)-parse(b.properties.start)));
-
-      cardsRoot.innerHTML='';
-      Object.keys(byGroup).sort().forEach(groupKey=>{
-        const [semLabel, subLabel] = groupKey.split(' — ');
-        const groupDiv=document.createElement('div'); groupDiv.className='card-group';
-        groupDiv.innerHTML=`<div class="card-group-title">${colorDot(subColor[subLabel]||'#ccc')} ${semLabel} · ${subLabel}</div>`;
-
-        byGroup[groupKey].forEach(f=>{
-          const p=f.properties;
-          const card=document.createElement('div'); card.className='card';
-          card.dataset.name = p.name;
-          card.dataset.semester = p.semester;
-          card.innerHTML=`
-            <div class="card-title">${p.name}</div>
-            <div class="card-sub">${p.location}</div>
-            <div class="card-dates">${p.start} → ${p.end}</div>
-            ${p.link ? `<a class="card-link" href="${p.link}" target="_blank" rel="noopener">Open website ↗</a>` : ``}
-          `;
-          card.addEventListener('click', ()=> openPopupAndSelectCard(f, p));
-          groupDiv.appendChild(card);
-        });
-        cardsRoot.appendChild(groupDiv);
-      });
-    }
+    // (No viewport-based refresh; cards list ALL selected)
+    // map.on('moveend', updateBottomPanel);
+  })();
   </script>
 </body>
 </html>
