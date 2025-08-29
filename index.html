@@ -447,6 +447,14 @@
         setTimeout(() => selectCardByUid(currentSelectedUid, { scroll: true }), 300);
       });
 
+      // NEW: when this marker's popup is closed, clear the card selection if it was selected
+      m.on('popupclose', () => {
+        if (currentSelectedUid === m._uid) {
+          currentSelectedUid = null;
+          clearCardSelection();
+        }
+      });
+
       return m;
     }
 
@@ -462,6 +470,11 @@
         }
         const idx = openOrder.indexOf(key);
         if (idx >= 0) openOrder.splice(idx, 1);
+        // If the removed group contained the selected item, clear selection
+        if (currentSelectedUid && arr.some(mm => mm._uid === currentSelectedUid)) {
+          currentSelectedUid = null;
+          clearCardSelection();
+        }
         updateBottomPanel();
         return;
       }
