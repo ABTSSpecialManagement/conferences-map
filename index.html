@@ -8,7 +8,29 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     :root { --font: "Century Gothic", CenturyGothic, AppleGothic, sans-serif; }
-    body { margin:0; padding:0; display:flex; flex-direction:column; height:100vh; }
+
+    * { box-sizing: border-box; }
+    body { margin:0; padding:0; display:flex; flex-direction:column; height:100vh; font-family: var(--font); }
+
+    /* Topbar (shown on mobile) */
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: none; align-items: center; justify-content: space-between;
+      padding: 0 10px; background:#fff; border-bottom:1px solid #e6e6e6; z-index: 1000;
+    }
+    #topbar .tb-title { font-weight:700; letter-spacing:.2px; }
+    #topbar .tb-btn {
+      appearance: none; border:1px solid #d6d6d6; background:#fff; padding:6px 10px; border-radius:8px;
+      font-size:14px; line-height:1; cursor:pointer; min-width:84px; text-align:center;
+      transition: transform .05s ease;
+    }
+    #topbar .tb-btn:active { transform: translateY(1px); }
+
+    /* Scrim behind drawers (mobile) */
+    #scrim { display:none; position: fixed; inset: 52px 0 0 0; background: rgba(0,0,0,.28); z-index: 999; }
+    #scrim.show { display:block; }
+
+    /* Desktop layout */
     #main { flex:1; display:flex; min-height:0; }
     #sidebar {
       width: 300px; padding: 12px; background: #f8f8f8; border-right: 1px solid #ddd;
@@ -19,21 +41,22 @@
       width: 260px; padding: 12px; background: #fafafa; border-left: 1px solid #ddd;
       font-family: var(--font); overflow-y: auto;
     }
+
     h2 { margin: 8px 0; font-size: 16px; }
     h3 { margin: 16px 0 6px; font-size: 14px; }
     .subs-list label { display:block; margin: 3px 0; font-size: 13px; cursor: pointer; }
     .muted { color:#666; font-size:12px; }
+
     .legend-title { margin: 8px 0; font-size: 14px; font-weight: 600; }
     .legend-item { display:flex; align-items:center; gap:8px; font-size:13px; margin: 5px 0; }
+
     .popup-content { line-height: 1.3; font-size: 13px; }
     .popup-content a { word-break: break-all; }
     .leaflet-popup-content,
     .leaflet-popup-content h1,
     .leaflet-popup-content h2,
     .leaflet-popup-content h3,
-    .leaflet-popup-content p {
-      font-family: var(--font) !important;
-    }
+    .leaflet-popup-content p { font-family: var(--font) !important; }
 
     /* Custom pin */
     .custom-pin { background: transparent; border: none; }
@@ -61,7 +84,7 @@
       display:inline-block;
     }
 
-    /* Bottom panel */
+    /* Bottom panel (cards) */
     #bottom-panel {
       border-top: 1px solid #ddd;
       background: #fff;
@@ -94,6 +117,7 @@
       flex: 0 0 auto;
     }
     .group-divider { flex-basis: 100%; height: 0; }
+
     #clear-btn {
       font-family: var(--font) !important;
       color:#fff; margin-top: 20px; padding: 10px 10px; font-size: 16px;
@@ -106,13 +130,51 @@
     #branding img { width: 250px; display: block; margin: 0 auto 8px; }
     #branding h1 { font-size: 18px; margin: 0; font-weight: 700; }
 
-    /* Map style selector */
+    /* Map style selector (in Legend) */
     #map-style { margin-top: 20px; font-size: 13px; }
     #map-style label { display: block; margin-bottom: 4px; }
+
+    /* ---------- Mobile drawers ---------- */
+    @media (max-width: 900px) {
+      /* show topbar, offset content below it */
+      #topbar { display:flex; padding-top: env(safe-area-inset-top); height: calc(52px + env(safe-area-inset-top)); }
+      #main { margin-top: calc(52px + env(safe-area-inset-top)); }
+
+      /* Turn side panels into fixed drawers */
+      #sidebar, #legend {
+        position: fixed; top: calc(52px + env(safe-area-inset-top)); bottom: 0;
+        width: 88vw; max-width: 420px; background: #fff; z-index: 1001;
+        transition: transform .25s ease; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+        overflow-y: auto;
+      }
+      #sidebar { left: 0;  transform: translateX(-100%); border-right: 1px solid #ddd; }
+      #legend  { right: 0; transform: translateX(100%);  border-left: 1px solid #ddd; }
+
+      #sidebar.open { transform: translateX(0); }
+      #legend.open  { transform: translateX(0); }
+
+      /* Let map take full width on mobile (drawers overlay it) */
+      #map { flex: 1 1 auto; }
+
+      /* Slightly tighter paddings */
+      #sidebar, #legend { padding: 12px; }
+      .subs-list label { margin: 6px 0; }
+      #branding img { width: 200px; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- Mobile top bar + scrim -->
+  <div id="topbar">
+    <button id="btn-filters" class="tb-btn" aria-controls="sidebar" aria-expanded="false">Filters</button>
+    <div class="tb-title">Conferences Map</div>
+    <button id="btn-legend" class="tb-btn" aria-controls="legend" aria-expanded="false">Legend</button>
+  </div>
+  <div id="scrim" aria-hidden="true"></div>
+
   <div id="main">
+    <!-- Left: Filters -->
     <div id="sidebar">
       <div id="branding">
         <img src="ABTSx4.png" alt="Logo">
@@ -125,11 +187,13 @@
       <div id="sem-II" class="subs-list"></div>
       <button id="clear-btn">Clear All</button>
       <hr>
-      <div class="muted">Scroll to zoom in or out.</div>
+      <div class="muted">Tip: tap anywhere on the map to close panels.</div>
     </div>
 
+    <!-- Map -->
     <div id="map"></div>
 
+    <!-- Right: Legend / Styles -->
     <div id="legend">
       <div class="legend-title">Legend (Subspecialty → Color)</div>
       <div id="legend-items"></div>
@@ -148,9 +212,9 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
   (async () => {
-    // ======= Load your prepared data (generated from the Excel) =======
-    // Put conferences_2026.json in the same folder as this HTML.
-    const DATA_URL = "conferences_2026.json";
+    // ======= Load your prepared data =======
+    // Put conferences_2026.updated.json in the same folder as this HTML.
+    const DATA_URL = "conferences_2026.updated.json";
     const DATA = await fetch(DATA_URL).then(r => r.json());
 
     // ======= Map setup =======
@@ -177,6 +241,52 @@
       });
     });
 
+    // ======= Mobile drawers (filters & legend) with ✕ toggles =======
+    const isMobile = () => window.matchMedia('(max-width: 900px)').matches;
+    const btnFilters = document.getElementById('btn-filters');
+    const btnLegend  = document.getElementById('btn-legend');
+    const scrim      = document.getElementById('scrim');
+    const sidebarEl  = document.getElementById('sidebar');
+    const legendEl   = document.getElementById('legend');
+    let openDrawer = null; // 'filters' | 'legend' | null
+
+    function setTopbarUI(){
+      btnFilters.textContent = (openDrawer === 'filters') ? '✕' : 'Filters';
+      btnLegend.textContent  = (openDrawer === 'legend')  ? '✕' : 'Legend';
+      btnFilters.setAttribute('aria-expanded', openDrawer === 'filters');
+      btnLegend.setAttribute('aria-expanded',  openDrawer === 'legend');
+    }
+    function openDrawerFn(which){
+      if (!isMobile()) return;
+      if (openDrawer === which) { closeDrawers(); return; }
+      // close the other one
+      if (openDrawer === 'filters') sidebarEl.classList.remove('open');
+      if (openDrawer === 'legend')  legendEl.classList.remove('open');
+
+      if (which === 'filters') sidebarEl.classList.add('open');
+      if (which === 'legend')  legendEl.classList.add('open');
+
+      openDrawer = which;
+      scrim.classList.add('show');
+      document.body.style.overflow='hidden';
+      setTopbarUI();
+    }
+    function closeDrawers(){
+      sidebarEl.classList.remove('open');
+      legendEl.classList.remove('open');
+      openDrawer = null;
+      scrim.classList.remove('show');
+      document.body.style.overflow='';
+      setTopbarUI();
+    }
+    btnFilters.addEventListener('click', ()=> openDrawerFn('filters'));
+    btnLegend .addEventListener('click', ()=> openDrawerFn('legend'));
+    scrim.addEventListener('click', closeDrawers);
+    window.addEventListener('resize', ()=> { if (!isMobile()) closeDrawers(); });
+    // Close drawers when tapping map
+    map.on('click', () => { if (isMobile() && openDrawer) closeDrawers(); });
+    setTopbarUI();
+
     // ======= Helpers =======
     function formatDate(iso) {
       if (!iso) return '';
@@ -199,24 +309,24 @@
       return { lat:null, lon:null };
     }
 
-    // ======= Popup content (NO additional description, clickable link) =======
+    // ======= Popup content =======
     function popupHTML(it) {
-  const shortN = safeText(it.short_name) || 'Conference';
-  const full   = safeText(it.full_name);
-  const loc    = safeText(it.location_raw) || 'TBA';
-  const sd     = formatDate(it.start_date);
-  const ed     = formatDate(it.end_date);
-  const link   = safeText(it.link);
+      const shortN = safeText(it.short_name) || 'Conference';
+      const full   = safeText(it.full_name);
+      const loc    = safeText(it.location_raw) || 'TBA';
+      const sd     = formatDate(it.start_date);
+      const ed     = formatDate(it.end_date);
+      const link   = safeText(it.link);
 
-  return `
-    <div class="popup-content">
-      <b>${shortN}</b>${full ? ` – ${full}` : ''}<br><br>
-      ${loc}<br><br>
-      ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
-      ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : ''}
-    </div>
-  `;
-}
+      return `
+        <div class="popup-content">
+          <b>${shortN}</b>${full ? ` – ${full}` : ''}<br><br>
+          ${loc}<br><br>
+          ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
+          ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : ''}
+        </div>
+      `;
+    }
 
     // ======= Group by semester + subspecialty =======
     const bySemester = { I: new Map(), II: new Map() };
@@ -227,42 +337,16 @@
       bySemester[sem].get(sub).push(it);
     }
 
-    // ======= Distinct colors per subspecialty (auto-extends beyond 24) =======
+    // ======= Distinct colors per subspecialty =======
     const SUBS_ALL = Array.from(new Set([
       ...Array.from(bySemester.I.keys()), ...Array.from(bySemester.II.keys())
     ])).sort();
 
     const BASE_PALETTE = [
-        "#e6194b", // red
-  "#3cb44b", // green
-  "#ffe119", // yellow
-  "#4363d8", // strong blue
-  "#f58231", // orange
-  "#911eb4", // purple
-  "#46f0f0", // cyan
-  "#f032e6", // magenta
-  "#bcf60c", // lime
-  "#fabebe", // pink
-  "#008080", // teal
-  "#e6beff", // lavender
-  "#9a6324", // brown
-  "#fffac8", // beige
-  "#800000", // dark red
-  "#aaffc3", // mint
-  "#808000", // olive
-  "#ffd8b1", // peach
-  "#000075", // navy
-  "#808080", // gray
-  "#ffe4e1", // light rose
-  "#40e0d0", // turquoise
-  "#6a3d9a", // deep violet
-  "#b15928", // reddish brown
-  "#2b908f", // muted cyan
-  "#ff7f0e", // vivid orange
-  "#1f77b4", // azure blue
-  "#2ca02c", // forest green
-  "#d62728", // crimson
-  "#9467bd"  // orchid purple
+      "#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#46f0f0","#f032e6",
+      "#bcf60c","#fabebe","#008080","#e6beff","#9a6324","#fffac8","#800000","#aaffc3",
+      "#808000","#ffd8b1","#000075","#808080","#ffe4e1","#40e0d0","#6a3d9a","#b15928",
+      "#2b908f","#ff7f0e","#1f77b4","#2ca02c","#d62728","#9467bd"
     ];
     function hslToHex(h, s, l) {
       s/=100; l/=100;
@@ -274,8 +358,8 @@
       const toHex = v => Math.round((v+m)*255).toString(16).padStart(2,'0');
       return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
     }
-    const COLORS = new Map();  // subspecialty -> hex
-    const ICONS  = new Map();  // subspecialty -> L.DivIcon
+    const COLORS = new Map();
+    const ICONS  = new Map();
     for (let i=0; i<SUBS_ALL.length; i++) {
       const color = BASE_PALETTE[i] || hslToHex((i* 360/SUBS_ALL.length) % 360, 70, 48);
       COLORS.set(SUBS_ALL[i], color);
@@ -384,19 +468,19 @@
     }
 
     function cardHTML(it, color) {
-  const title = safeText(it.short_name) || 'Conference';
-  const loc   = safeText(it.location_raw) || 'TBA';
-  const sd    = formatDate(it.start_date);
-  const ed    = formatDate(it.end_date);
-  return `
-    <div class="conf-title">
-      <span class="card-pin" style="--pin-color:${color}"></span>
-      <span>${title}</span>
-    </div>
-    <div class="conf-meta">${loc}</div>
-    <div class="conf-meta">${sd}${ed ? ' – ' + ed : ''}</div>
-  `;
-}
+      const title = safeText(it.short_name) || 'Conference';
+      const loc   = safeText(it.location_raw) || 'TBA';
+      const sd    = formatDate(it.start_date);
+      const ed    = formatDate(it.end_date);
+      return `
+        <div class="conf-title">
+          <span class="card-pin" style="--pin-color:${color}"></span>
+          <span>${title}</span>
+        </div>
+        <div class="conf-meta">${loc}</div>
+        <div class="conf-meta">${sd}${ed ? ' – ' + ed : ''}</div>
+      `;
+    }
 
     function updateBottomPanel() {
       const panel = document.getElementById('bottom-panel');
@@ -425,6 +509,7 @@
           el.addEventListener('click', () => {
             m.openPopup();
             map.panTo(m.getLatLng(), { animate: true }); // no zoom change
+            if (isMobile() && openDrawer) closeDrawers(); // close drawer after choosing
           });
           panel.appendChild(el);
         }
@@ -438,7 +523,9 @@
       for (const [sub, items] of semMap.entries()) {
         const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
         const cb = document.getElementById(id);
-        cb.addEventListener('change', () => toggleSet(cb.checked, semId, sub, items));
+        cb.addEventListener('change', () => {
+          toggleSet(cb.checked, semId, sub, items);
+        });
       }
     }
     wire('sem-I', bySemester.I);
