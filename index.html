@@ -43,7 +43,6 @@
     }
 
     h2 { margin: 8px 0; font-size: 16px; }
-    h3 { margin: 16px 0 6px; font-size: 14px; }
     .subs-list label { display:block; margin: 3px 0; font-size: 13px; cursor: pointer; }
     .muted { color:#666; font-size:12px; }
 
@@ -140,11 +139,9 @@
 
     /* ---------- Mobile drawers ---------- */
     @media (max-width: 900px) {
-      /* show topbar, offset content below it */
       #topbar { display:flex; padding-top: env(safe-area-inset-top); height: calc(52px + env(safe-area-inset-top)); }
       #main { margin-top: calc(52px + env(safe-area-inset-top)); }
 
-      /* Turn side panels into fixed drawers */
       #sidebar, #legend {
         position: fixed; top: calc(52px + env(safe-area-inset-top)); bottom: 0;
         width: 88vw; max-width: 420px; background: #fff; z-index: 1001;
@@ -157,10 +154,8 @@
       #sidebar.open { transform: translateX(0); }
       #legend.open  { transform: translateX(0); }
 
-      /* Let map take full width on mobile (drawers overlay it) */
       #map { flex: 1 1 auto; }
 
-      /* Slightly tighter paddings */
       #sidebar, #legend { padding: 12px; }
       .subs-list label { margin: 6px 0; }
       #branding img { width: 200px; }
@@ -415,12 +410,8 @@
       // When marker is clicked → highlight card & scroll to it
       m.on('click', () => {
         currentSelectedUid = m._uid;
-        // Pan without changing zoom
         map.panTo(m.getLatLng(), { animate: true });
-        // Ensure the card exists/visible, then select & scroll
-        // 1) refresh panel if needed
         updateBottomPanel();
-        // 2) select now, and again shortly after move animation
         selectCardByUid(currentSelectedUid, { scroll: true });
         setTimeout(() => selectCardByUid(currentSelectedUid, { scroll: true }), 300);
       });
@@ -488,14 +479,15 @@
       if (scroll) el.scrollIntoView({ behavior:'smooth', block:'center', inline:'nearest' });
     }
 
+    // ---- SHOW ALL SELECTED PINS (no viewport filtering) ----
     function updateBottomPanel() {
       const panel = document.getElementById('bottom-panel');
       panel.innerHTML = '';
-      const bounds = map.getBounds();
 
+      // Group every marker that is currently added to the map (i.e., selected via filters)
       const groupMap = new Map();
       visibleMarkers.forEach(m => {
-        if (map.hasLayer(m) && bounds.contains(m.getLatLng())) {
+        if (map.hasLayer(m)) {
           if (!groupMap.has(m._groupKey)) groupMap.set(m._groupKey, []);
           groupMap.get(m._groupKey).push(m);
         }
@@ -511,11 +503,9 @@
           const color = m._color;
           const el = document.createElement('div');
           el.className = 'conf-card';
-          el.dataset.uid = m._uid;            // <-- stable id to reselect/scroll
+          el.dataset.uid = m._uid;
           el.innerHTML = cardHTML(it, color);
-          if (m._uid === currentSelectedUid) {
-            el.classList.add('selected');     // preserve selection on re-render
-          }
+          if (m._uid === currentSelectedUid) el.classList.add('selected');
           el.addEventListener('click', () => {
             currentSelectedUid = m._uid;
             clearCardSelection();
@@ -576,25 +566,8 @@
     wire('sem-I', bySemester.I);
     wire('sem-II', bySemester.II);
 
-    map.on('moveend', updateBottomPanel);
-
-    // ======= Clear All =======
-    document.getElementById('clear-btn').addEventListener('click', () => {
-      document.querySelectorAll('#sidebar input[type="checkbox"]').forEach(cb => {
-        if (cb.checked) {
-          cb.checked = false;
-          const sub = cb.dataset.sub;
-          const semId = cb.dataset.sem;
-          const items = (semId === 'sem-I' ? bySemester.I : bySemester.II).get(sub) || [];
-          toggleSet(false, semId, sub, items);
-        }
-      });
-      visibleMarkers.forEach(m => { if (map.hasLayer(m)) map.removeLayer(m); });
-      visibleMarkers.clear();
-      openOrder.length = 0;
-      currentSelectedUid = null;
-      updateBottomPanel();
-    });
+    // No need to refresh on map move anymore (cards show ALL selected)
+    // map.on('moveend', updateBottomPanel);
   })();
   </script>
 </body>
