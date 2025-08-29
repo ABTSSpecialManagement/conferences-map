@@ -50,7 +50,7 @@
     .legend-item { display:flex; align-items:center; gap:8px; font-size:13px; margin: 5px 0; }
 
     .popup-content { line-height: 1.3; font-size: 13px; }
-    .popup-content a { word-break: break-all; }
+    .popup-content a { word-break: break-all; text-decoration: underline; color: #1f6feb; }
     .leaflet-popup-content,
     .leaflet-popup-content h1,
     .leaflet-popup-content h2,
@@ -350,7 +350,7 @@
           <b>${shortN}</b>${full ? ` – ${full}` : ''}<br><br>
           ${loc}<br><br>
           ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
-          ${link ? `<a href="${link}" target="_blank" rel="noopener">${link}</a>` : ''}
+          ${link ? `<a href="${link}" target="_blank" rel="noopener">Visit website</a>` : ''}
         </div>
       `;
     }
@@ -447,7 +447,7 @@
         setTimeout(() => selectCardByUid(currentSelectedUid, { scroll: true }), 300);
       });
 
-      // NEW: when this marker's popup is closed, clear the card selection if it was selected
+      // when this marker's popup is closed, clear the card selection if it was selected
       m.on('popupclose', () => {
         if (currentSelectedUid === m._uid) {
           currentSelectedUid = null;
