@@ -34,12 +34,12 @@
     #main { flex:1; display:flex; min-height:0; }
     #sidebar {
       width: 300px; padding: 12px; background: #f8f8f8; border-right: 1px solid #ddd;
-      font-family: var(--font); overflow-y: auto;
+      overflow-y: auto;
     }
     #map { flex:1; height: 100%; background: #D5E8EB; }
     #legend {
       width: 260px; padding: 12px; background: #fafafa; border-left: 1px solid #ddd;
-      font-family: var(--font); overflow-y: auto;
+      overflow-y: auto;
     }
 
     h2 { margin: 8px 0; font-size: 16px; }
@@ -94,7 +94,6 @@
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      font-family: var(--font);
     }
     .conf-card {
       border: 1px solid #ddd;
@@ -104,9 +103,14 @@
       cursor: pointer;
       flex: 1 1 260px;
       font-size: 13px;
-      transition: background 0.15s ease, box-shadow 0.15s ease;
+      transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
     }
     .conf-card:hover { background: #f1f1f1; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .conf-card.selected {
+      background: #e9f1ff;
+      border-color: #4a90e2;
+      box-shadow: 0 0 0 2px rgba(74,144,226,0.35);
+    }
     .conf-title { font-weight: 700; margin-bottom: 4px; display:flex; align-items:center; gap:8px; }
     .conf-meta { color:#444; }
     .card-pin {
@@ -213,7 +217,6 @@
   <script>
   (async () => {
     // ======= Load your prepared data =======
-    // Put conferences_2026.updated.json in the same folder as this HTML.
     const DATA_URL = "conferences_2026.updated.json";
     const DATA = await fetch(DATA_URL).then(r => r.json());
 
@@ -259,7 +262,6 @@
     function openDrawerFn(which){
       if (!isMobile()) return;
       if (openDrawer === which) { closeDrawers(); return; }
-      // close the other one
       if (openDrawer === 'filters') sidebarEl.classList.remove('open');
       if (openDrawer === 'legend')  legendEl.classList.remove('open');
 
@@ -283,7 +285,6 @@
     btnLegend .addEventListener('click', ()=> openDrawerFn('legend'));
     scrim.addEventListener('click', closeDrawers);
     window.addEventListener('resize', ()=> { if (!isMobile()) closeDrawers(); });
-    // Close drawers when tapping map
     map.on('click', () => { if (isMobile() && openDrawer) closeDrawers(); });
     setTopbarUI();
 
@@ -378,43 +379,20 @@
       return icon;
     }
 
-    // ======= Build checkboxes =======
-    function buildCheckboxes(semId, semMap) {
-      const container = document.getElementById(semId);
-      const subs = Array.from(semMap.keys()).sort();
-      for (const sub of subs) {
-        const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
-        const label = document.createElement('label');
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.id = id;
-        cb.dataset.sub = sub;
-        cb.dataset.sem = semId;
-        label.appendChild(cb);
-        label.append(' ', sub);
-        container.appendChild(label);
-      }
-    }
-    buildCheckboxes('sem-I', bySemester.I);
-    buildCheckboxes('sem-II', bySemester.II);
-
-    // ======= Build legend =======
-    function buildLegend() {
-      const legend = document.getElementById('legend-items');
-      for (const sub of SUBS_ALL) {
-        const color = COLORS.get(sub);
-        const row = document.createElement('div');
-        row.className = 'legend-item';
-        row.innerHTML = `<span class="legend-pin" style="--pin-color:${color}"></span><span>${sub}</span>`;
-        legend.appendChild(row);
-      }
-    }
-    buildLegend();
-
     // ======= Markers, toggling, and bottom panel =======
     const markerGroups = new Map(); // key: semId__sub -> markers[]
     const visibleMarkers = new Set();
     const openOrder = [];
+
+    // selected state tracking
+    let currentSelectedUid = null;
+
+    function buildUid(it) {
+      return [
+        safeText(it.short_name), safeText(it.start_date),
+        safeText(it.location_raw), safeText(it.link)
+      ].join('|');
+    }
 
     async function ensureMarker(it, icon, color, key, orderIdx, sub) {
       let lat = (typeof it.lat === 'number') ? it.lat : null;
@@ -432,6 +410,21 @@
       m._order = orderIdx;
       m._sub = sub;
       m._color = color;
+      m._uid = buildUid(it);
+
+      // When marker is clicked → highlight card & scroll to it
+      m.on('click', () => {
+        currentSelectedUid = m._uid;
+        // Pan without changing zoom
+        map.panTo(m.getLatLng(), { animate: true });
+        // Ensure the card exists/visible, then select & scroll
+        // 1) refresh panel if needed
+        updateBottomPanel();
+        // 2) select now, and again shortly after move animation
+        selectCardByUid(currentSelectedUid, { scroll: true });
+        setTimeout(() => selectCardByUid(currentSelectedUid, { scroll: true }), 300);
+      });
+
       return m;
     }
 
@@ -482,6 +475,19 @@
       `;
     }
 
+    function clearCardSelection() {
+      document.querySelectorAll('.conf-card.selected').forEach(el => el.classList.remove('selected'));
+    }
+
+    function selectCardByUid(uid, { scroll=false }={}) {
+      if (!uid) return;
+      const el = document.querySelector(`.conf-card[data-uid="${CSS.escape(uid)}"]`);
+      if (!el) return;
+      clearCardSelection();
+      el.classList.add('selected');
+      if (scroll) el.scrollIntoView({ behavior:'smooth', block:'center', inline:'nearest' });
+    }
+
     function updateBottomPanel() {
       const panel = document.getElementById('bottom-panel');
       panel.innerHTML = '';
@@ -505,11 +511,18 @@
           const color = m._color;
           const el = document.createElement('div');
           el.className = 'conf-card';
+          el.dataset.uid = m._uid;            // <-- stable id to reselect/scroll
           el.innerHTML = cardHTML(it, color);
+          if (m._uid === currentSelectedUid) {
+            el.classList.add('selected');     // preserve selection on re-render
+          }
           el.addEventListener('click', () => {
+            currentSelectedUid = m._uid;
+            clearCardSelection();
+            el.classList.add('selected');
             m.openPopup();
             map.panTo(m.getLatLng(), { animate: true }); // no zoom change
-            if (isMobile() && openDrawer) closeDrawers(); // close drawer after choosing
+            if (isMobile() && openDrawer) closeDrawers();
           });
           panel.appendChild(el);
         }
@@ -518,6 +531,38 @@
         panel.appendChild(divider);
       }
     }
+
+    // ======= Build checkboxes & legend =======
+    function buildCheckboxes(semId, semMap) {
+      const container = document.getElementById(semId);
+      const subs = Array.from(semMap.keys()).sort();
+      for (const sub of subs) {
+        const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = id;
+        cb.dataset.sub = sub;
+        cb.dataset.sem = semId;
+        label.appendChild(cb);
+        label.append(' ', sub);
+        container.appendChild(label);
+      }
+    }
+    function buildLegend() {
+      const legend = document.getElementById('legend-items');
+      for (const sub of SUBS_ALL) {
+        const color = COLORS.get(sub);
+        const row = document.createElement('div');
+        row.className = 'legend-item';
+        row.innerHTML = `<span class="legend-pin" style="--pin-color:${color}"></span><span>${sub}</span>`;
+        legend.appendChild(row);
+      }
+    }
+
+    buildCheckboxes('sem-I', bySemester.I);
+    buildCheckboxes('sem-II', bySemester.II);
+    buildLegend();
 
     function wire(semId, semMap) {
       for (const [sub, items] of semMap.entries()) {
@@ -547,6 +592,7 @@
       visibleMarkers.forEach(m => { if (map.hasLayer(m)) map.removeLayer(m); });
       visibleMarkers.clear();
       openOrder.length = 0;
+      currentSelectedUid = null;
       updateBottomPanel();
     });
   })();
