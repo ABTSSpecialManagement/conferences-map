@@ -610,6 +610,26 @@
     wire('sem-I', bySemester.I);
     wire('sem-II', bySemester.II);
 
+    function clearAllSelections() {
+  document.querySelectorAll('#sidebar input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+
+  for (const arr of markerGroups.values()) {
+    for (const m of arr) {
+      if (map.hasLayer(m)) map.removeLayer(m);
+    }
+  }
+
+  visibleMarkers.clear();
+  openOrder.length = 0;
+  currentSelectedUid = null;
+  map.closePopup();
+
+  clearCardSelection();
+  updateBottomPanel();
+}
+
+document.getElementById('clear-btn').addEventListener('click', clearAllSelections);
+
     // (No viewport-based refresh; cards list ALL selected)
     // map.on('moveend', updateBottomPanel);
   })();
