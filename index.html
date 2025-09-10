@@ -43,14 +43,14 @@
     }
 
     h2 { margin: 8px 0; font-size: 16px; }
-    .subs-list label { display:block; margin: 3px 0; font-size: 13px; cursor: pointer; }
+    .subs-list label { display:block; margin: 6px 0; font-size: 13px; cursor: pointer; }
     .muted { color:#666; font-size:12px; }
 
     .legend-title { margin: 8px 0; font-size: 14px; font-weight: 600; }
     .legend-item { display:flex; align-items:center; gap:8px; font-size:13px; margin: 5px 0; }
 
     .popup-content { line-height: 1.3; font-size: 13px; }
-    .popup-content a { word-break: break-all; text-decoration: underline; color: #1f6feb; }
+    .popup-content a { text-decoration: underline; color: #1f6feb; }
     .leaflet-popup-content,
     .leaflet-popup-content h1,
     .leaflet-popup-content h2,
@@ -61,9 +61,9 @@
     .leaflet-popup-content-wrapper { border-radius: 10px; }
     @media (max-width: 900px) {
       .leaflet-popup-content-wrapper {
-        max-height: 60vh;                 /* scroll inside popup if tall */
+        max-height: 60vh;
         overflow: auto;
-        max-width: calc(100vw - 48px);    /* never wider than viewport minus side padding */
+        max-width: calc(100vw - 48px);
       }
     }
 
@@ -167,7 +167,6 @@
       #map { flex: 1 1 auto; }
 
       #sidebar, #legend { padding: 12px; }
-      .subs-list label { margin: 6px 0; }
       #branding img { width: 200px; }
     }
   </style>
@@ -190,10 +189,9 @@
         <h1>Conferences Map</h1>
       </div>
 
-      <h2>Semester I (Jan–Jun)</h2>
-      <div id="sem-I" class="subs-list"></div>
-      <h2>Semester II (Jul–Dec)</h2>
-      <div id="sem-II" class="subs-list"></div>
+      <h2>Subspecialties (A–Z)</h2>
+      <div id="subs-list" class="subs-list"></div>
+
       <button id="clear-btn">Clear All</button>
       <hr>
       <div class="muted">Tip: tap anywhere on the map to close panels.</div>
@@ -222,7 +220,7 @@
   <script>
   (async () => {
     // ======= Load your prepared data =======
-    const DATA_URL = "conferences_2026.updated.json";
+    const DATA_URL = "conferences_2026.updated.json"; // 'semester' is ignored
     const DATA = await fetch(DATA_URL).then(r => r.json());
 
     // ======= Map setup =======
@@ -319,8 +317,8 @@
     // Popup options with edge padding (prevents clipping on top & sides)
     function popupOpts() {
       const mobile = isMobile();
-      const H_PAD = mobile ? 24 : 12;             // left/right padding
-      const TOPBAR_PADDING = 90;                  // topbar + a bit of cushion
+      const H_PAD = mobile ? 24 : 12;   // left/right padding
+      const TOPBAR_PADDING = 90;        // topbar + cushion
       const V_TOP  = mobile ? (TOPBAR_PADDING + 12) : 12;
       const V_BR   = 12;
       const maxW = mobile
@@ -347,28 +345,24 @@
 
       return `
         <div class="popup-content">
-          <b>${shortN}</b>${full ? ` – ${full}` : ''}<br><br>
+          <b>${shortN}</b>${full ? ' – ' + full : ''}<br><br>
           ${loc}<br><br>
-          ${sd && ed ? `from ${sd} to ${ed}.<br><br>` : ''}
-          ${link ? `<a href="${link}" target="_blank" rel="noopener">Visit website</a>` : ''}
+          ${(sd && ed) ? ('from ' + sd + ' to ' + ed + '.<br><br>') : ''}
+          ${link ? ('<a href="' + link + '" target="_blank" rel="noopener">Visit website</a>') : ''}
         </div>
       `;
     }
 
-    // ======= Group by semester + subspecialty =======
-    const bySemester = { I: new Map(), II: new Map() };
+    // ======= Group by subspecialty only (A–Z) =======
+    const bySub = new Map();
     for (const it of DATA) {
-      const sem = it.semester === 'II' ? 'II' : 'I';
       const sub = safeText(it.subspecialty) || 'Unspecified';
-      if (!bySemester[sem].has(sub)) bySemester[sem].set(sub, []);
-      bySemester[sem].get(sub).push(it);
+      if (!bySub.has(sub)) bySub.set(sub, []);
+      bySub.get(sub).push(it);
     }
+    const SUBS_ALL = Array.from(bySub.keys()).sort((a,b)=> a.localeCompare(b));
 
     // ======= Distinct colors per subspecialty =======
-    const SUBS_ALL = Array.from(new Set([
-      ...Array.from(bySemester.I.keys()), ...Array.from(bySemester.II.keys())
-    ])).sort();
-
     const BASE_PALETTE = [
       "#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4","#46f0f0","#f032e6",
       "#bcf60c","#fabebe","#008080","#e6beff","#9a6324","#fffac8","#800000","#aaffc3",
@@ -406,9 +400,9 @@
     }
 
     // ======= Markers, toggling, and bottom panel =======
-    const markerGroups = new Map(); // key: semId__sub -> markers[]
+    const markerGroups = new Map(); // key: sub -> markers[]
     const visibleMarkers = new Set();
-    const openOrder = [];
+    const openOrder = [];          // preserves selection order of subs
 
     // selected state tracking
     let currentSelectedUid = null;
@@ -420,11 +414,11 @@
       ].join('|');
     }
 
-    async function ensureMarker(it, icon, color, key, orderIdx, sub) {
+    async function ensureMarker(it, icon, color, keySub, orderIdx) {
       let lat = (typeof it.lat === 'number') ? it.lat : null;
       let lon = (typeof it.lon === 'number') ? it.lon : null;
 
-      if ((lat == null || lon == null) && (it.location_raw)) {
+      if ((lat == null || lon == null) && it.location_raw) {
         const res = await geocode(it.location_raw);
         lat = res.lat; lon = res.lon;
       }
@@ -432,9 +426,9 @@
 
       const m = L.marker([lat, lon], { icon }).bindPopup(popupHTML(it), popupOpts());
       m._confData = it;
-      m._groupKey = key;
+      m._groupKey = keySub;   // sub
       m._order = orderIdx;
-      m._sub = sub;
+      m._sub = keySub;
       m._color = color;
       m._uid = buildUid(it);
 
@@ -458,8 +452,8 @@
       return m;
     }
 
-    async function toggleSet(checked, semKey, sub, items) {
-      const key = `${semKey}__${sub}`;
+    async function toggleSet(checked, sub, items) {
+      const key = sub;
       if (!markerGroups.has(key)) markerGroups.set(key, []);
       const arr = markerGroups.get(key);
 
@@ -486,7 +480,7 @@
         const color = COLORS.get(sub);
         let i = 0;
         for (const it of items) {
-          const m = await ensureMarker(it, icon, color, key, i++, sub);
+          const m = await ensureMarker(it, icon, color, key, i++);
           if (m) arr.push(m);
         }
       }
@@ -567,17 +561,15 @@
     }
 
     // ======= Build checkboxes & legend =======
-    function buildCheckboxes(semId, semMap) {
-      const container = document.getElementById(semId);
-      const subs = Array.from(semMap.keys()).sort();
-      for (const sub of subs) {
-        const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
+    function buildCheckboxes() {
+      const container = document.getElementById('subs-list');
+      for (const sub of SUBS_ALL) {
+        const id = `sub__${sub.replace(/\W+/g,'_')}`;
         const label = document.createElement('label');
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.id = id;
         cb.dataset.sub = sub;
-        cb.dataset.sem = semId;
         label.appendChild(cb);
         label.append(' ', sub);
         container.appendChild(label);
@@ -594,43 +586,41 @@
       }
     }
 
-    buildCheckboxes('sem-I', bySemester.I);
-    buildCheckboxes('sem-II', bySemester.II);
+    buildCheckboxes();
     buildLegend();
 
-    function wire(semId, semMap) {
-      for (const [sub, items] of semMap.entries()) {
-        const id = `${semId}__${sub.replace(/\W+/g,'_')}`;
+    function wire() {
+      for (const sub of SUBS_ALL) {
+        const id = `sub__${sub.replace(/\W+/g,'_')}`;
         const cb = document.getElementById(id);
+        const items = bySub.get(sub) || [];
         cb.addEventListener('change', () => {
-          toggleSet(cb.checked, semId, sub, items);
+          toggleSet(cb.checked, sub, items);
         });
       }
     }
-    wire('sem-I', bySemester.I);
-    wire('sem-II', bySemester.II);
+    wire();
 
     function clearAllSelections() {
-  document.querySelectorAll('#sidebar input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+      document.querySelectorAll('#sidebar input[type="checkbox"]').forEach(cb => { cb.checked = false; });
 
-  for (const arr of markerGroups.values()) {
-    for (const m of arr) {
-      if (map.hasLayer(m)) map.removeLayer(m);
+      for (const arr of markerGroups.values()) {
+        for (const m of arr) {
+          if (map.hasLayer(m)) map.removeLayer(m);
+        }
+      }
+
+      visibleMarkers.clear();
+      openOrder.length = 0;
+      currentSelectedUid = null;
+      map.closePopup();
+
+      clearCardSelection();
+      updateBottomPanel();
     }
-  }
+    document.getElementById('clear-btn').addEventListener('click', clearAllSelections);
 
-  visibleMarkers.clear();
-  openOrder.length = 0;
-  currentSelectedUid = null;
-  map.closePopup();
-
-  clearCardSelection();
-  updateBottomPanel();
-}
-
-document.getElementById('clear-btn').addEventListener('click', clearAllSelections);
-
-    // (No viewport-based refresh; cards list ALL selected)
+    // No viewport-based refresh; cards list ALL selected
     // map.on('moveend', updateBottomPanel);
   })();
   </script>
