@@ -258,11 +258,12 @@
     let openDrawer = null; // 'filters' | 'legend' | null
 
     function setTopbarUI(){
-      btnFilters.textContent = (openDrawer === 'filters') ? '✕' : 'Filters';
-      btnLegend.textContent  = (openDrawer === 'legend')  ? '✕' : 'Legend';
-      btnFilters.setAttribute('aria-expanded', openDrawer === 'filters');
-      btnLegend.setAttribute('aria-expanded',  openDrawer === 'legend');
-    }
+  btnFilters.textContent = (openDrawer === 'filters') ? '✕' : 'Filters';
+  btnLegend.textContent  = (openDrawer === 'legend')  ? '✕' : 'Guide';
+  btnFilters.setAttribute('aria-expanded', openDrawer === 'filters');
+  btnLegend.setAttribute('aria-expanded',  openDrawer === 'legend');
+}
+
     function openDrawerFn(which){
       if (!isMobile()) return;
       if (openDrawer === which) { closeDrawers(); return; }
